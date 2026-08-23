@@ -1,0 +1,26 @@
+COMO ENVIAR AO REPOSITORIO SISTEMA-FARMACIA
+============================================
+
+1. Baixe e extraia o arquivo Sistema_Farmacia_GitHub_Actions_1.2.5.zip.
+2. No computador, abra:
+   https://github.com/brunojcmendes-commits/sistema-farmacia
+3. Clique em Add file e depois em Upload files.
+4. Envie TODOS os arquivos e pastas que estao dentro do ZIP, inclusive:
+   .github
+   windows
+   .gitignore
+   README.md
+   requirements-build.txt
+5. No final da pagina, clique em Commit changes.
+6. Abra a aba Actions do repositorio.
+7. Selecione Gerar instalador Windows.
+8. Clique em Run workflow e confirme no botao verde.
+9. Aguarde a execucao concluir com o simbolo verde.
+10. Abra a execucao e, em Artifacts, baixe:
+    Sistema-Farmacia-Windows-1.2.5
+11. Extraia o artefato para obter:
+    Sistema_Farmacia_Setup_1.2.5.exe
+
+O instalador final nao exige Python no computador do usuario.
+Ele permite escolher Gerente Farmacia, Cliente Farmacia ou ambos.
+
