@@ -70,7 +70,7 @@ jobs:
       - name: Publicar instalador para download
         uses: actions/upload-artifact@v4
         with:
-          name: Sistema-Farmacia-Windows-1.2.5
-          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.2.5.exe
+         name: Sistema-Farmacia-Windows-1.2.6
+path: windows/installer/Saida/Sistema_Farmacia_Setup_1.2.6.exe
           if-no-files-found: error
           retention-days: 30
