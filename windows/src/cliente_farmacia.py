@@ -25,7 +25,7 @@ from farmacia_api import (
     gerar_pdf_comprovante_pedido,
 )
 
-VERSAO_APP="1.2.5"
+VERSAO_APP="1.2.6"
 SERVIDOR_CENTRAL_PADRAO="http://10.56.121.182:5000"
 POSTOS_GRADUACOES=["Sd Ev","Sd","Cb","3º Sgt","2º Sgt","1º Sgt","ST","Asp","2º Ten","1º Ten","Cap","Maj","TC","Cel","Gen"]
 
@@ -121,7 +121,21 @@ class LinhaPedido:
             return
         termo=self.var_medicamento.get().strip().casefold()
         nomes=[m["medicamento"] for m in self._medicamentos_cache]
-        self.combo_medicamento["values"]=[n for n in nomes if termo in n.casefold()] if termo else nomes
+        filtrados=[n for n in nomes if termo in n.casefold()] if termo else nomes
+        self.combo_medicamento["values"]=filtrados
+        maior=max([len(self.var_medicamento.get())]+[len(n) for n in filtrados[:20]]+[55])
+        self.combo_medicamento.configure(width=min(100,maior+3))
+        if termo:
+            exato=next((m for m in self._medicamentos_cache if m["medicamento"].casefold()==termo),None)
+            unico=next((m for m in self._medicamentos_cache if len(filtrados)==1 and m["medicamento"]==filtrados[0]),None)
+            candidato=exato or unico
+            if candidato:self._mostrar_detalhes_medicamento(candidato)
+            elif filtrados:self.var_nome_completo.set(f"Resultado encontrado: {filtrados[0]}")
+            else:self.var_nome_completo.set("Nenhum medicamento/material encontrado.")
+            try:self.combo_medicamento.event_generate("<Down>")
+            except tk.TclError:pass
+        else:
+            self.var_nome_completo.set("Nome completo: selecione um medicamento/material.")
 
     def _confirmar_medicamento_digitado(self, event=None):
         digitado=self.var_medicamento.get().strip()
@@ -136,8 +150,19 @@ class LinhaPedido:
         info = next((m for m in self._medicamentos_cache if m["medicamento"] == nome), None)
         if not info:
             return
+        self._mostrar_detalhes_medicamento(info)
+
+    def _mostrar_detalhes_medicamento(self, info):
+        nome=info["medicamento"]
         self.var_nome_completo.set(f"Nome completo: {nome}")
         texto = f"Estoque disponível: {info['estoque_total']}"
+        cartelas=info.get("comprimidos_por_cartela") or []
+        if cartelas:
+            valores=", ".join(str(v) for v in cartelas)
+            rotulo="Comprimidos por cartela" if len(cartelas)==1 else "Comprimidos por cartela (conforme o lote)"
+            texto += f"   |   {rotulo}: {valores}"
+        else:
+            texto += "   |   Comprimidos por cartela: não informado"
         if info["validade_mais_proxima"]:
             texto += f"   |   Validade mais próxima: {info['validade_mais_proxima']}"
         else:

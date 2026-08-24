@@ -27,7 +27,7 @@ from farmacia_api import (
 )
 
 INTERVALO_NOTIFICACOES_MS = 5000  # a cada 5s consulta se chegou pedido novo
-VERSAO_APP = "1.2.5"
+VERSAO_APP = "1.2.6"
 SERVIDOR_CENTRAL_PADRAO = "http://10.56.121.182:5000"
 
 def configurar_rolagem_tabela(frame, tree):
@@ -402,12 +402,16 @@ class App(tk.Tk):
             style="Cartao.TLabel", font=("Segoe UI", 8),
         ).grid(row=5, column=1, sticky="w")
 
-        ttk.Label(cartao, text="Estoque inicial:", style="Cartao.TLabel").grid(row=6, column=0, sticky="w", pady=6)
+        ttk.Label(cartao, text="Comprimidos por cartela:", style="Cartao.TLabel").grid(row=6, column=0, sticky="w", pady=6)
+        self.var_comprimidos_cartela = tk.StringVar()
+        ttk.Entry(cartao, textvariable=self.var_comprimidos_cartela, width=38).grid(row=6, column=1, sticky="w", pady=6)
+
+        ttk.Label(cartao, text="Estoque inicial:", style="Cartao.TLabel").grid(row=7, column=0, sticky="w", pady=6)
         self.var_estoque_inicial = tk.StringVar()
-        ttk.Entry(cartao, textvariable=self.var_estoque_inicial, width=38).grid(row=6, column=1, sticky="w", pady=6)
+        ttk.Entry(cartao, textvariable=self.var_estoque_inicial, width=38).grid(row=7, column=1, sticky="w", pady=6)
 
         ttk.Button(cartao, text="Cadastrar Lote", command=self._cadastrar_lote).grid(
-            row=7, column=0, columnspan=2, pady=(18, 0), sticky="ew"
+            row=8, column=0, columnspan=2, pady=(18, 0), sticky="ew"
         )
 
         # Lista de lotes já cadastrados na categoria (ajuda a evitar duplicidade e a conferir)
@@ -433,10 +437,10 @@ class App(tk.Tk):
         frame_lista = ttk.Frame(aba, style="TFrame")
         frame_lista.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
-        colunas = ("medicamento", "ficha", "validade", "inicial", "atual")
+        colunas = ("medicamento", "ficha", "cartela", "validade", "inicial", "atual")
         titulos = {"medicamento": "Medicamento", "ficha": "Ficha", "validade": "Validade",
-                   "inicial": "Estoque Inicial", "atual": "Estoque Atual"}
-        larguras = {"medicamento": 320, "ficha": 110, "validade": 110, "inicial": 110, "atual": 110}
+                   "cartela": "Comp./cartela", "inicial": "Estoque Inicial", "atual": "Estoque Atual"}
+        larguras = {"medicamento": 280, "ficha": 90, "cartela": 105, "validade": 105, "inicial": 100, "atual": 100}
         self.tree_lotes = ttk.Treeview(frame_lista, columns=colunas, show="headings", selectmode="browse")
         for col in colunas:
             self.tree_lotes.heading(col, text=titulos[col])
@@ -477,7 +481,7 @@ class App(tk.Tk):
                 except ValueError:pass
             self.tree_lotes.insert(
                 "", "end",
-                values=(l["medicamento"], l["ficha"], l["validade"] or "-", l["estoque_inicial"], l["estoque_atual"]),
+                values=(l["medicamento"], l["ficha"], l.get("comprimidos_cartela") or "-", l["validade"] or "-", l["estoque_inicial"], l["estoque_atual"]),
                 tags=(tag,) if tag else (),
             )
 
@@ -490,7 +494,7 @@ class App(tk.Tk):
             return
 
         valores = self.tree_lotes.item(selecionado[0], "values")
-        medicamento, ficha, validade_exibida, estoque_inicial, estoque_atual = valores
+        medicamento, ficha, comprimidos_cartela, validade_exibida, estoque_inicial, estoque_atual = valores
         validade = None if validade_exibida == "-" else validade_exibida
         categoria = self.var_categoria.get()
 
@@ -528,24 +532,26 @@ class App(tk.Tk):
         sel=self.tree_lotes.selection()
         if not sel: messagebox.showwarning("Atenção","Selecione um lote."); return
         vals=self.tree_lotes.item(sel[0],"values")
-        categoria=self.var_categoria.get(); medicamento,ficha,validade,ini,atual=vals
+        categoria=self.var_categoria.get(); medicamento,ficha,comprimidos_cartela,validade,ini,atual=vals
         if validade=="-": validade=""
         janela=tk.Toplevel(self); janela.title("Editar lote"); janela.configure(bg=COR_FUNDO_CARTAO); janela.transient(self); janela.grab_set()
-        campos=[("Medicamento/Material",medicamento),("Ficha",ficha),("Validade",validade),("Estoque Inicial",ini),("Estoque Atual",atual)]
+        campos=[("Medicamento/Material",medicamento),("Ficha",ficha),("Comprimidos por cartela","" if comprimidos_cartela=="-" else comprimidos_cartela),("Validade",validade),("Estoque Inicial",ini),("Estoque Atual",atual)]
         vars_=[]
         for i,(rot,val) in enumerate(campos):
             ttk.Label(janela,text=rot,style="Cartao.TLabel").grid(row=i,column=0,sticky="w",padx=12,pady=6)
             v=tk.StringVar(value=str(val)); vars_.append(v); ttk.Entry(janela,textvariable=v,width=34).grid(row=i,column=1,padx=12,pady=6)
         def salvar():
             try:
-                if vars_[2].get().strip(): datetime.strptime(vars_[2].get().strip(),FORMATO_DATA)
-                ni=float(vars_[3].get().replace(",",".")); na=float(vars_[4].get().replace(",","."))
-                self.api.editar_lote(categoria,medicamento,ficha,validade,vars_[0].get().strip(),vars_[1].get().strip(),vars_[2].get().strip(),ni,na)
+                comp=int(vars_[2].get()) if vars_[2].get().strip() else None
+                if comp is not None and comp<=0:raise ValueError
+                if vars_[3].get().strip(): datetime.strptime(vars_[3].get().strip(),FORMATO_DATA)
+                ni=float(vars_[4].get().replace(",",".")); na=float(vars_[5].get().replace(",","."))
+                self.api.editar_lote(categoria,medicamento,ficha,validade,vars_[0].get().strip(),vars_[1].get().strip(),vars_[3].get().strip(),ni,na,comp)
             except ValueError: messagebox.showerror("Erro","Verifique data e estoques.",parent=janela); return
             except ErroConexao as e: messagebox.showerror("Erro",str(e),parent=janela); return
             janela.destroy(); self._atualizar_lista_lotes(categoria,self.var_busca_lote.get().strip()); messagebox.showinfo("Sucesso","Lote atualizado.")
-        ttk.Button(janela,text="← Voltar / Fechar",style="Secundario.TButton",command=janela.destroy).grid(row=5,column=0,pady=12,padx=(12,6),sticky="ew")
-        ttk.Button(janela,text="Salvar alterações",command=salvar).grid(row=5,column=1,pady=12,padx=(6,12),sticky="ew")
+        ttk.Button(janela,text="← Voltar / Fechar",style="Secundario.TButton",command=janela.destroy).grid(row=6,column=0,pady=12,padx=(12,6),sticky="ew")
+        ttk.Button(janela,text="Salvar alterações",command=salvar).grid(row=6,column=1,pady=12,padx=(6,12),sticky="ew")
 
     def _cadastrar_lote(self):
         if not self._servidor_configurado():
@@ -555,6 +561,7 @@ class App(tk.Tk):
         validade = self.var_validade.get().strip()
         ficha = self.var_ficha.get().strip()
         estoque_str = self.var_estoque_inicial.get().strip()
+        comprimidos_str = self.var_comprimidos_cartela.get().strip()
 
         if not categoria:
             messagebox.showwarning("Atenção", "Selecione a categoria.")
@@ -578,7 +585,15 @@ class App(tk.Tk):
             return
 
         try:
-            resultado = self.api.cadastrar_lote(categoria, medicamento, ficha, estoque_inicial, validade or None)
+            comprimidos_cartela = int(comprimidos_str) if comprimidos_str else None
+            if comprimidos_cartela is not None and comprimidos_cartela <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Erro", "Comprimidos por cartela deve ser um número inteiro maior que zero.")
+            return
+
+        try:
+            resultado = self.api.cadastrar_lote(categoria, medicamento, ficha, estoque_inicial, validade or None, comprimidos_cartela)
         except ErroConexao as e:
             messagebox.showerror("Erro de conexão", str(e))
             return
@@ -598,6 +613,7 @@ class App(tk.Tk):
         self.var_validade.set("")
         self.var_ficha.set("")
         self.var_estoque_inicial.set("")
+        self.var_comprimidos_cartela.set("")
         self._atualizar_lista_lotes(categoria)
 
     # ------------------------ aba: histórico / relatórios -----------------------
