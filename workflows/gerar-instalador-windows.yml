@@ -1,0 +1,74 @@
+name: Gerar instalador Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    name: Compilar Sistema Farmacia
+    runs-on: windows-2022
+
+    steps:
+      - name: Baixar o repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Instalar o compilador dos aplicativos
+        shell: powershell
+        run: python -m pip install "pyinstaller>=6,<7"
+
+      - name: Compilar Gerente e Cliente Farmacia
+        shell: powershell
+        run: |
+          Push-Location "windows/src"
+          pyinstaller --noconfirm --clean --windowed --onefile `
+            --name "Gerente_Farmacia" `
+            --icon "Gerente_Farmacia.ico" `
+            --add-data "Gerente_Farmacia.png;." `
+            gerente_farmacia.py
+          pyinstaller --noconfirm --clean --windowed --onefile `
+            --name "Cliente_Farmacia" `
+            --icon "Cliente_Farmacia.ico" `
+            --add-data "Cliente_Farmacia.png;." `
+            cliente_farmacia.py
+          Pop-Location
+
+      - name: Preparar arquivos do instalador
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force "windows/installer/Arquivos_do_Programa" | Out-Null
+          Copy-Item "windows/src/dist/Gerente_Farmacia.exe" "windows/installer/Arquivos_do_Programa/"
+          Copy-Item "windows/src/dist/Cliente_Farmacia.exe" "windows/installer/Arquivos_do_Programa/"
+          Copy-Item "windows/src/Gerente_Farmacia.ico" "windows/installer/Arquivos_do_Programa/"
+          Copy-Item "windows/src/Cliente_Farmacia.ico" "windows/installer/Arquivos_do_Programa/"
+
+      - name: Instalar Inno Setup
+        shell: powershell
+        run: choco install innosetup -y --no-progress
+
+      - name: Gerar Setup profissional
+        shell: powershell
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Compilador Inno Setup nao encontrado." }
+          & $iscc "windows/installer/Sistema_Farmacia_Setup.iss"
+
+      - name: Publicar instalador para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sistema-Farmacia-Windows-1.2.6
+          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.2.6.exe
+          if-no-files-found: error
+          retention-days: 30
