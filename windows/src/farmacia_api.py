@@ -192,12 +192,12 @@ class EstoqueAPICliente:
             raise ErroConexao(r.json().get("erro", "Erro ao cadastrar lote."))
         return r.json()
 
-    def excluir_lote(self, categoria: str, medicamento: str, ficha: str, validade: str = None, motivo: str = "Exclusão manual"):
+    def excluir_lote(self, categoria: str, medicamento: str, ficha: str, validade: str = None, motivo: str = "Exclusão manual", lote_id=None):
         try:
             r = requests.delete(
                 self._url("/itens"),
                 json={
-                    "categoria": categoria, "medicamento": medicamento,
+                    "lote_id": lote_id, "categoria": categoria, "medicamento": medicamento,
                     "ficha": ficha, "validade": validade or "", "motivo": motivo,
                 },
                 timeout=TIMEOUT_SEGUNDOS,
@@ -208,9 +208,9 @@ class EstoqueAPICliente:
             raise ErroConexao(r.json().get("erro", "Erro ao excluir lote."))
         return True
 
-    def editar_lote(self, categoria, medicamento, ficha, validade, novo_medicamento, nova_ficha, nova_validade, novo_estoque_inicial, novo_estoque_atual, novos_comprimidos_cartela=None):
+    def editar_lote(self, categoria, medicamento, ficha, validade, novo_medicamento, nova_ficha, nova_validade, novo_estoque_inicial, novo_estoque_atual, novos_comprimidos_cartela=None, lote_id=None):
         try:
-            r=requests.put(self._url("/itens"),json={"categoria":categoria,"medicamento":medicamento,"ficha":ficha,"validade":validade or "","novo_medicamento":novo_medicamento,"nova_ficha":nova_ficha,"nova_validade":nova_validade or "","novo_estoque_inicial":novo_estoque_inicial,"novo_estoque_atual":novo_estoque_atual,"novos_comprimidos_cartela":novos_comprimidos_cartela or ""},timeout=TIMEOUT_SEGUNDOS)
+            r=requests.put(self._url("/itens"),json={"lote_id":lote_id,"categoria":categoria,"medicamento":medicamento,"ficha":ficha,"validade":validade or "","novo_medicamento":novo_medicamento,"nova_ficha":nova_ficha,"nova_validade":nova_validade or "","novo_estoque_inicial":novo_estoque_inicial,"novo_estoque_atual":novo_estoque_atual,"novos_comprimidos_cartela":novos_comprimidos_cartela or ""},timeout=TIMEOUT_SEGUNDOS)
         except requests.exceptions.RequestException: raise ErroConexao("Não foi possível editar o lote.")
         if r.status_code!=200: raise ErroConexao(r.json().get("erro","Erro ao editar lote."))
         return r.json()

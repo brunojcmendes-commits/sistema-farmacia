@@ -27,8 +27,18 @@ from farmacia_api import (
 )
 
 INTERVALO_NOTIFICACOES_MS = 5000  # a cada 5s consulta se chegou pedido novo
-VERSAO_APP = "1.2.6"
+VERSAO_APP = "1.2.7"
 SERVIDOR_CENTRAL_PADRAO = "http://10.56.121.182:5000"
+
+def normalizar_data_interface(valor):
+    """Aceita data brasileira ou ISO e sempre devolve dd/mm/aaaa."""
+    texto=str(valor or '').strip()
+    if not texto or texto=='-':return ''
+    for formato in (FORMATO_DATA,'%Y-%m-%dT%H:%M:%S','%Y-%m-%d %H:%M:%S','%Y-%m-%d'):
+        try:return datetime.strptime(texto,formato).strftime(FORMATO_DATA)
+        except ValueError:pass
+    try:return datetime.fromisoformat(texto.replace('Z','+00:00')).strftime(FORMATO_DATA)
+    except ValueError:return texto
 
 def configurar_rolagem_tabela(frame, tree):
     """Adiciona rolagem vertical e horizontal sem reduzir a área útil da tabela."""
@@ -46,11 +56,11 @@ class BotaoArredondado(tk.Canvas):
         self.command=command;self.cor=cor;self.cor_hover=cor_hover;self.texto=text
         self.bind('<Configure>',lambda e:self._desenhar(self.cor));self.bind('<Enter>',lambda e:self._desenhar(self.cor_hover));self.bind('<Leave>',lambda e:self._desenhar(self.cor));self.bind('<Button-1>',lambda e:self.command())
     def _desenhar(self,cor):
-        self.delete('all');w=max(self.winfo_width(),80);h=34;r=14
-        self.create_arc(1,1,2*r,2*r,start=90,extent=180,fill=cor,outline=cor)
-        self.create_arc(w-2*r-1,1,w-1,2*r,start=-90,extent=180,fill=cor,outline=cor)
-        self.create_rectangle(r,1,w-r,h,fill=cor,outline=cor)
-        self.create_text(w/2,h/2,text=self.texto,fill='white',font=('Segoe UI',9,'bold'))
+        self.delete('all');w=max(self.winfo_width(),80);h=max(30,self.winfo_height()-2);r=h/2
+        self.create_oval(1,1,h+1,h+1,fill=cor,outline=cor)
+        self.create_oval(w-h-1,1,w-1,h+1,fill=cor,outline=cor)
+        self.create_rectangle(r,1,w-r,h+1,fill=cor,outline=cor)
+        self.create_text(w/2,(h+2)/2,text=self.texto,fill='white',font=('Segoe UI',9,'bold'))
 
 class CartaoPainel(tk.Canvas):
     def __init__(self,parent,titulo,variavel,command,**kwargs):
@@ -167,7 +177,6 @@ class App(tk.Tk):
         self.lbl_usuario.pack(side="left", padx=(18,0))
         barra_acoes=tk.Frame(self,bg=COR_FUNDO);barra_acoes.pack(fill="x",padx=12,pady=(6,0))
         self.btn_entrar=BotaoArredondado(barra_acoes,text="Entrar",command=self._entrar_ou_configurar,width=90);self.btn_entrar.pack(side='left')
-        self.btn_auditoria=BotaoArredondado(barra_acoes,text="Auditoria",command=self._abrir_auditoria,width=100)
         self.btn_usuarios=BotaoArredondado(barra_acoes,text="Usuários",command=self._abrir_usuarios,width=90)
         self.btn_sair=BotaoArredondado(barra_acoes,text="Sair",command=self._logout,width=65)
         BotaoArredondado(barra_acoes,text="Configurar servidor",command=self._configurar_servidor,width=140).pack(side="right")
@@ -372,65 +381,70 @@ class App(tk.Tk):
         configurar_rolagem_tabela(tabela,tree);ttk.Button(janela,text="Fechar",command=janela.destroy).pack(pady=(0,10))
 
     def _montar_aba_cadastro(self, aba):
-        cartao = ttk.Frame(aba, style="Cartao.TFrame", padding=24)
-        cartao.pack(fill="x", padx=8, pady=8, anchor="n")
+        cartao = ttk.Frame(aba, style="Cartao.TFrame", padding=14)
+        cartao.pack(fill="x", padx=8, pady=(6, 4), anchor="n")
+        cartao.grid_columnconfigure(1, weight=1)
+        cartao.grid_columnconfigure(3, weight=1)
 
         ttk.Label(cartao, text="Categoria:", style="Cartao.TLabel").grid(row=0, column=0, sticky="w", pady=6)
         self.var_categoria = tk.StringVar()
         combo_categoria = ttk.Combobox(
             cartao, textvariable=self.var_categoria, values=CATEGORIAS, state="readonly", width=36
         )
-        combo_categoria.grid(row=0, column=1, sticky="w", pady=6)
+        combo_categoria.grid(row=0, column=1, sticky="ew", padx=(6, 18), pady=4)
 
-        ttk.Label(cartao, text="Medicamento/Material:", style="Cartao.TLabel").grid(row=1, column=0, sticky="w", pady=6)
+        ttk.Label(cartao, text="Medicamento/Material:", style="Cartao.TLabel").grid(row=0, column=2, sticky="w", pady=4)
         self.var_medicamento = tk.StringVar()
-        ttk.Entry(cartao, textvariable=self.var_medicamento, width=38).grid(row=1, column=1, sticky="w", pady=6)
+        ttk.Entry(cartao, textvariable=self.var_medicamento, width=38).grid(row=0, column=3, sticky="ew", padx=(6, 0), pady=4)
 
-        ttk.Label(cartao, text="Data de validade (dd/mm/aaaa):", style="Cartao.TLabel").grid(row=2, column=0, sticky="w", pady=6)
+        ttk.Label(cartao, text="Data de validade:", style="Cartao.TLabel").grid(row=1, column=0, sticky="w", pady=4)
         self.var_validade = tk.StringVar()
-        ttk.Entry(cartao, textvariable=self.var_validade, width=38).grid(row=2, column=1, sticky="w", pady=6)
+        ttk.Entry(cartao, textvariable=self.var_validade, width=38).grid(row=1, column=1, sticky="ew", padx=(6, 18), pady=4)
         ttk.Label(
             cartao, text="(deixe em branco se não aplicável, ex: alguns materiais)",
             style="Cartao.TLabel", font=("Segoe UI", 8),
-        ).grid(row=3, column=1, sticky="w")
+        ).grid(row=2, column=1, sticky="w", padx=(6, 18))
 
-        ttk.Label(cartao, text="Número da ficha:", style="Cartao.TLabel").grid(row=4, column=0, sticky="w", pady=6)
+        ttk.Label(cartao, text="Número da ficha:", style="Cartao.TLabel").grid(row=1, column=2, sticky="w", pady=4)
         self.var_ficha = tk.StringVar()
-        ttk.Entry(cartao, textvariable=self.var_ficha, width=38).grid(row=4, column=1, sticky="w", pady=6)
+        ttk.Entry(cartao, textvariable=self.var_ficha, width=38).grid(row=1, column=3, sticky="ew", padx=(6, 0), pady=4)
         ttk.Label(
             cartao, text="(identifica este lote — pode repetir o medicamento com fichas diferentes)",
             style="Cartao.TLabel", font=("Segoe UI", 8),
-        ).grid(row=5, column=1, sticky="w")
+        ).grid(row=2, column=3, sticky="w", padx=(6, 0))
 
-        ttk.Label(cartao, text="Comprimidos por cartela:", style="Cartao.TLabel").grid(row=6, column=0, sticky="w", pady=6)
+        ttk.Label(cartao, text="Comprimidos por cartela:", style="Cartao.TLabel").grid(row=3, column=0, sticky="w", pady=4)
         self.var_comprimidos_cartela = tk.StringVar()
-        ttk.Entry(cartao, textvariable=self.var_comprimidos_cartela, width=38).grid(row=6, column=1, sticky="w", pady=6)
+        ttk.Entry(cartao, textvariable=self.var_comprimidos_cartela, width=38).grid(row=3, column=1, sticky="ew", padx=(6, 18), pady=4)
 
-        ttk.Label(cartao, text="Estoque inicial:", style="Cartao.TLabel").grid(row=7, column=0, sticky="w", pady=6)
+        ttk.Label(cartao, text="Estoque inicial:", style="Cartao.TLabel").grid(row=3, column=2, sticky="w", pady=4)
         self.var_estoque_inicial = tk.StringVar()
-        ttk.Entry(cartao, textvariable=self.var_estoque_inicial, width=38).grid(row=7, column=1, sticky="w", pady=6)
+        ttk.Entry(cartao, textvariable=self.var_estoque_inicial, width=38).grid(row=3, column=3, sticky="ew", padx=(6, 0), pady=4)
 
         ttk.Button(cartao, text="Cadastrar Lote", command=self._cadastrar_lote).grid(
-            row=8, column=0, columnspan=2, pady=(18, 0), sticky="ew"
+            row=4, column=0, columnspan=4, pady=(10, 0), sticky="ew"
         )
 
         # Lista de lotes já cadastrados na categoria (ajuda a evitar duplicidade e a conferir)
         linha_titulo_lista = ttk.Frame(aba, style="TFrame")
-        linha_titulo_lista.pack(fill="x", padx=8, pady=(12, 4))
+        linha_titulo_lista.pack(fill="x", padx=8, pady=(5, 2))
         ttk.Label(linha_titulo_lista, text="Lotes cadastrados na categoria selecionada:", style="TLabel",
                   font=("Segoe UI", 10, "bold")).pack(side="left")
-        ttk.Button(linha_titulo_lista, text="Editar lote", style="Secundario.TButton", command=self._editar_lote_selecionado).pack(side="right")
+
+        linha_controles_lista = ttk.Frame(aba, style="TFrame")
+        linha_controles_lista.pack(fill="x", padx=8, pady=(0, 4))
+        ttk.Button(linha_controles_lista, text="Editar lote", style="Secundario.TButton", command=self._editar_lote_selecionado).pack(side="right")
         ttk.Button(
-            linha_titulo_lista, text="Excluir lote selecionado", style="Secundario.TButton",
+            linha_controles_lista, text="Excluir lote selecionado", style="Secundario.TButton",
             command=self._excluir_lote_selecionado,
         ).pack(side="right", padx=(0,8))
-        ttk.Label(linha_titulo_lista, text="Pesquisar:", style="TLabel").pack(side="left", padx=(20,6))
+        ttk.Label(linha_controles_lista, text="Pesquisar:", style="TLabel").pack(side="left", padx=(0,6))
         self.var_busca_lote = tk.StringVar()
-        ent_busca = ttk.Entry(linha_titulo_lista, textvariable=self.var_busca_lote, width=28)
-        ent_busca.pack(side="left")
+        ent_busca = ttk.Entry(linha_controles_lista, textvariable=self.var_busca_lote, width=42)
+        ent_busca.pack(side="left", fill="x", expand=True)
         ent_busca.bind("<KeyRelease>", lambda e: self._atualizar_lista_lotes(self.var_categoria.get(), self.var_busca_lote.get().strip()))
         ttk.Button(
-            linha_titulo_lista, text="Atualizar lista", style="Secundario.TButton",
+            linha_controles_lista, text="Atualizar lista", style="Secundario.TButton",
             command=lambda: self._atualizar_lista_lotes(self.var_categoria.get()),
         ).pack(side="right", padx=(0, 8))
 
@@ -441,7 +455,7 @@ class App(tk.Tk):
         titulos = {"medicamento": "Medicamento", "ficha": "Ficha", "validade": "Validade",
                    "cartela": "Comp./cartela", "inicial": "Estoque Inicial", "atual": "Estoque Atual"}
         larguras = {"medicamento": 280, "ficha": 90, "cartela": 105, "validade": 105, "inicial": 100, "atual": 100}
-        self.tree_lotes = ttk.Treeview(frame_lista, columns=colunas, show="headings", selectmode="browse")
+        self.tree_lotes = ttk.Treeview(frame_lista, columns=colunas, show="headings", selectmode="browse", height=14)
         for col in colunas:
             self.tree_lotes.heading(col, text=titulos[col])
             self.tree_lotes.column(col, width=larguras[col], anchor="w" if col == "medicamento" else "center")
@@ -480,8 +494,8 @@ class App(tk.Tk):
                     tag="vermelho" if dias<=90 else "laranja" if dias<=120 else "verde"
                 except ValueError:pass
             self.tree_lotes.insert(
-                "", "end",
-                values=(l["medicamento"], l["ficha"], l.get("comprimidos_cartela") or "-", l["validade"] or "-", l["estoque_inicial"], l["estoque_atual"]),
+                "", "end", iid=str(l["id"]),
+                values=(l["medicamento"], l["ficha"], l.get("comprimidos_cartela") or "-", normalizar_data_interface(l.get("validade")) or "-", l["estoque_inicial"], l["estoque_atual"]),
                 tags=(tag,) if tag else (),
             )
 
@@ -532,8 +546,9 @@ class App(tk.Tk):
         sel=self.tree_lotes.selection()
         if not sel: messagebox.showwarning("Atenção","Selecione um lote."); return
         vals=self.tree_lotes.item(sel[0],"values")
+        lote_id=int(sel[0])
         categoria=self.var_categoria.get(); medicamento,ficha,comprimidos_cartela,validade,ini,atual=vals
-        if validade=="-": validade=""
+        validade=normalizar_data_interface(validade)
         janela=tk.Toplevel(self); janela.title("Editar lote"); janela.configure(bg=COR_FUNDO_CARTAO); janela.transient(self); janela.grab_set()
         campos=[("Medicamento/Material",medicamento),("Ficha",ficha),("Comprimidos por cartela","" if comprimidos_cartela=="-" else comprimidos_cartela),("Validade",validade),("Estoque Inicial",ini),("Estoque Atual",atual)]
         vars_=[]
@@ -546,7 +561,7 @@ class App(tk.Tk):
                 if comp is not None and comp<=0:raise ValueError
                 if vars_[3].get().strip(): datetime.strptime(vars_[3].get().strip(),FORMATO_DATA)
                 ni=float(vars_[4].get().replace(",",".")); na=float(vars_[5].get().replace(",","."))
-                self.api.editar_lote(categoria,medicamento,ficha,validade,vars_[0].get().strip(),vars_[1].get().strip(),vars_[3].get().strip(),ni,na,comp)
+                self.api.editar_lote(categoria,medicamento,ficha,validade,vars_[0].get().strip(),vars_[1].get().strip(),vars_[3].get().strip(),ni,na,comp,lote_id)
             except ValueError: messagebox.showerror("Erro","Verifique data e estoques.",parent=janela); return
             except ErroConexao as e: messagebox.showerror("Erro",str(e),parent=janela); return
             janela.destroy(); self._atualizar_lista_lotes(categoria,self.var_busca_lote.get().strip()); messagebox.showinfo("Sucesso","Lote atualizado.")
@@ -710,7 +725,7 @@ class App(tk.Tk):
         }
         larguras = {"categoria": 150, "medicamento": 280, "ficha": 90, "validade": 100, "situacao": 170, "estoque": 90}
 
-        self.tree_alertas = ttk.Treeview(tabela_frame, columns=colunas, show="headings", selectmode="browse")
+        self.tree_alertas = ttk.Treeview(tabela_frame, columns=colunas, show="headings", selectmode="extended")
         for col in colunas:
             self.tree_alertas.heading(col, text=titulos[col])
             self.tree_alertas.column(col, width=larguras[col], anchor="center")
@@ -724,6 +739,8 @@ class App(tk.Tk):
         rodape.pack(fill="x", padx=8, pady=(4, 8))
         self.lbl_total_alertas = ttk.Label(rodape, text="", style="TLabel")
         self.lbl_total_alertas.pack(side="left")
+        ttk.Button(rodape,text="Excluir lotes selecionados",style="Secundario.TButton",command=self._excluir_alertas_selecionados).pack(side="right",padx=(8,0))
+        ttk.Button(rodape,text="Selecionar todos",command=self._selecionar_todos_alertas).pack(side="right")
 
     def _montar_aba_apoio(self, aba):
         topo=ttk.Frame(aba,style="Cartao.TFrame",padding=14); topo.pack(fill="x",padx=8,pady=8)
@@ -1027,7 +1044,7 @@ class App(tk.Tk):
         self.btn_entrar.pack_forget()
         self.btn_sair.pack(side='right',padx=(0,8))
         if u['perfil']=='gerente':
-            self.btn_auditoria.pack(side='right',padx=(0,8));self.btn_usuarios.pack(side='right',padx=(0,8))
+            self.btn_usuarios.pack(side='right',padx=(0,8))
             if str(self.aba_auditoria) not in self.notebook.tabs():self.notebook.add(self.aba_auditoria,text='  Auditoria  ')
             self._buscar_auditoria()
         if u.get('trocar_senha'):
@@ -1046,7 +1063,7 @@ class App(tk.Tk):
     def _logout(self):
         if self.api:self.api.logout()
         self.usuario_logado=None;self.lbl_usuario.configure(text='Acesso: aguardando login')
-        for b in (self.btn_sair,self.btn_usuarios,self.btn_auditoria):b.pack_forget()
+        for b in (self.btn_sair,self.btn_usuarios):b.pack_forget()
         if str(self.aba_auditoria) in self.notebook.tabs():self.notebook.forget(self.aba_auditoria)
         self.btn_entrar.pack(side='left')
         self._abrir_login()
@@ -1309,6 +1326,31 @@ class App(tk.Tk):
 
     # ------------------------------ eventos: alertas --------------------------------
 
+    def _selecionar_todos_alertas(self):
+        itens=self.tree_alertas.get_children()
+        if itens:self.tree_alertas.selection_set(itens)
+
+    def _excluir_alertas_selecionados(self):
+        selecionados=self.tree_alertas.selection()
+        if not selecionados:
+            messagebox.showwarning("Alertas de Validade","Selecione um ou mais lotes.")
+            return
+        quantidade=len(selecionados)
+        if not messagebox.askyesno("Excluir lotes",f"Excluir os {quantidade} lote(s) selecionado(s)?\n\nEles serão arquivados na aba 'Lotes Excluídos' e a operação ficará registrada na auditoria."):
+            return
+        motivo=simpledialog.askstring("Motivo da exclusão","Informe o motivo da exclusão:",initialvalue="Exclusão pela aba Alertas de Validade",parent=self)
+        if motivo is None:return
+        erros=[]
+        for item in selecionados:
+            valores=self.tree_alertas.item(item,"values")
+            categoria,medicamento,ficha,validade=valores[:4]
+            try:self.api.excluir_lote(categoria,medicamento,ficha,validade,motivo.strip() or "Exclusão pela aba Alertas de Validade",int(item))
+            except (ErroConexao,ValueError) as exc:erros.append(f"{medicamento} — ficha {ficha}: {exc}")
+        self._buscar_alertas();self._buscar_excluidos();self._atualizar_dashboard()
+        excluidos=quantidade-len(erros)
+        if erros:messagebox.showwarning("Exclusão concluída",f"{excluidos} lote(s) excluído(s).\n{len(erros)} lote(s) não puderam ser excluídos.\n\n"+"\n".join(erros[:5]))
+        else:messagebox.showinfo("Exclusão concluída",f"{excluidos} lote(s) foram arquivados em 'Lotes Excluídos'.")
+
     def _buscar_alertas(self, mostrar_popup=False):
         if not self.api:
             return
@@ -1337,7 +1379,7 @@ class App(tk.Tk):
                 situacao = f"Vence em {a['dias_restantes']} dia(s)"
                 tag = "verde"
             self.tree_alertas.insert(
-                "", "end",
+                "", "end", iid=str(a["id"]),
                 values=(a["categoria"], a["medicamento"], a["ficha"], a["validade"], situacao, a["estoque"]),
                 tags=(tag,),
             )

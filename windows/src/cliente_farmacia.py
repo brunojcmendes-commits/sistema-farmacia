@@ -25,7 +25,7 @@ from farmacia_api import (
     gerar_pdf_comprovante_pedido,
 )
 
-VERSAO_APP="1.2.6"
+VERSAO_APP="1.2.7"
 SERVIDOR_CENTRAL_PADRAO="http://10.56.121.182:5000"
 POSTOS_GRADUACOES=["Sd Ev","Sd","Cb","3º Sgt","2º Sgt","1º Sgt","ST","Asp","2º Ten","1º Ten","Cap","Maj","TC","Cel","Gen"]
 
@@ -77,10 +77,19 @@ class LinhaPedido:
         self.combo_medicamento.bind("<Return>", self._confirmar_medicamento_digitado)
         self.combo_medicamento.bind("<FocusOut>", self._confirmar_medicamento_digitado)
 
+        self.lista_sugestoes=tk.Listbox(
+            linha2,height=6,bg="white",fg="#1D2618",selectbackground=COR_DESTAQUE,
+            selectforeground="#1D2618",exportselection=False,font=("Segoe UI",9),relief="solid",bd=1,
+        )
+        self.lista_sugestoes.grid(row=1,column=1,columnspan=3,sticky="ew",padx=(6,0),pady=(0,4))
+        self.lista_sugestoes.grid_remove()
+        self.lista_sugestoes.bind("<ButtonRelease-1>",self._selecionar_sugestao)
+        self.lista_sugestoes.bind("<Return>",self._selecionar_sugestao)
+
         tk.Label(linha2, text="Quantidade:", bg=COR_FUNDO_CARTAO, fg=COR_TEXTO,
-                 font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=(8,0))
+                 font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=(8,0))
         self.var_quantidade = tk.StringVar()
-        tk.Entry(linha2, textvariable=self.var_quantidade, width=10).grid(row=1, column=1, sticky="w", padx=(6, 0), pady=(8,0))
+        tk.Entry(linha2, textvariable=self.var_quantidade, width=10).grid(row=2, column=1, sticky="w", padx=(6, 0), pady=(8,0))
         linha2.grid_columnconfigure(1,weight=1)
 
         self.var_nome_completo = tk.StringVar(value="Nome completo: selecione um medicamento/material.")
@@ -103,6 +112,7 @@ class LinhaPedido:
         self.var_medicamento.set("")
         self.var_nome_completo.set("Nome completo: selecione um medicamento/material.")
         self.combo_medicamento["values"] = []
+        self.lista_sugestoes.grid_remove()
         self.var_info.set("Carregando medicamentos...")
         if not self.app.api:
             return
@@ -117,7 +127,9 @@ class LinhaPedido:
         self.var_info.set(f"{len(medicamentos)} medicamento(s)/material(is) disponível(is) nesta categoria.")
 
     def _filtrar_medicamentos(self, event=None):
-        if event and event.keysym in ("Up","Down","Left","Right","Return","Tab","Escape"):
+        if event and event.keysym=="Escape":
+            self.lista_sugestoes.grid_remove();return
+        if event and event.keysym in ("Up","Down","Left","Right","Return","Tab"):
             return
         termo=self.var_medicamento.get().strip().casefold()
         nomes=[m["medicamento"] for m in self._medicamentos_cache]
@@ -125,6 +137,12 @@ class LinhaPedido:
         self.combo_medicamento["values"]=filtrados
         maior=max([len(self.var_medicamento.get())]+[len(n) for n in filtrados[:20]]+[55])
         self.combo_medicamento.configure(width=min(100,maior+3))
+        self.lista_sugestoes.delete(0,"end")
+        for nome in filtrados[:10]:self.lista_sugestoes.insert("end",nome)
+        if termo and filtrados:
+            self.lista_sugestoes.configure(height=min(8,len(filtrados)))
+            self.lista_sugestoes.grid()
+        else:self.lista_sugestoes.grid_remove()
         if termo:
             exato=next((m for m in self._medicamentos_cache if m["medicamento"].casefold()==termo),None)
             unico=next((m for m in self._medicamentos_cache if len(filtrados)==1 and m["medicamento"]==filtrados[0]),None)
@@ -132,10 +150,16 @@ class LinhaPedido:
             if candidato:self._mostrar_detalhes_medicamento(candidato)
             elif filtrados:self.var_nome_completo.set(f"Resultado encontrado: {filtrados[0]}")
             else:self.var_nome_completo.set("Nenhum medicamento/material encontrado.")
-            try:self.combo_medicamento.event_generate("<Down>")
-            except tk.TclError:pass
         else:
             self.var_nome_completo.set("Nome completo: selecione um medicamento/material.")
+
+    def _selecionar_sugestao(self,event=None):
+        selecao=self.lista_sugestoes.curselection()
+        if not selecao:return
+        self.var_medicamento.set(self.lista_sugestoes.get(selecao[0]))
+        self.lista_sugestoes.grid_remove()
+        self._on_medicamento_selecionado()
+        self.combo_medicamento.focus_set();self.combo_medicamento.icursor("end")
 
     def _confirmar_medicamento_digitado(self, event=None):
         digitado=self.var_medicamento.get().strip()
@@ -146,6 +170,7 @@ class LinhaPedido:
         elif len(filtrados)==1:self.var_medicamento.set(filtrados[0]);self._on_medicamento_selecionado()
 
     def _on_medicamento_selecionado(self, event=None):
+        self.lista_sugestoes.grid_remove()
         nome = self.var_medicamento.get()
         info = next((m for m in self._medicamentos_cache if m["medicamento"] == nome), None)
         if not info:
