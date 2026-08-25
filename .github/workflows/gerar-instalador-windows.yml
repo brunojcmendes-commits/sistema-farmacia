@@ -3,11 +3,8 @@ name: Gerar instalador Windows
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-
-permissions:
-  contents: read
+    tags:
+      - "v*"
 
 permissions:
   contents: read
@@ -65,12 +62,10 @@ jobs:
         shell: powershell
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            throw "Compilador Inno Setup nao encontrado."
-          }
+          if (-not (Test-Path $iscc)) { throw "Compilador Inno Setup nao encontrado." }
           & $iscc "windows/installer/Sistema_Farmacia_Setup.iss"
 
-          - name: Publicar instalador para download
+      - name: Publicar instalador para download
         uses: actions/upload-artifact@v4
         with:
           name: Sistema-Farmacia-Windows-1.2.6
