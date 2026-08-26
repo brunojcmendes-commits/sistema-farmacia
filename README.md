@@ -1,4 +1,4 @@
-# Sistema Farmacia 1.2.5
+# Sistema Farmacia 1.2.7
 
 Projeto do Gerente Farmacia e Cliente Farmacia para Windows.
 
@@ -8,8 +8,8 @@ Projeto do Gerente Farmacia e Cliente Farmacia para Windows.
 2. Selecione **Gerar instalador Windows**.
 3. Clique em **Run workflow** e confirme.
 4. Aguarde a execucao ficar verde.
-5. Abra a execucao e baixe o artefato **Sistema-Farmacia-Windows-1.2.5**.
-6. Extraia o ZIP baixado para obter `Sistema_Farmacia_Setup_1.2.5.exe`.
+5. Abra a execucao e baixe o artefato **Sistema-Farmacia-Windows-1.2.7**.
+6. Extraia o ZIP baixado para obter `Sistema_Farmacia_Setup_1.2.7.exe`.
 
 O instalador e produzido em um Windows Server 2022 pelo GitHub Actions. Os
 aplicativos sao empacotados com PyInstaller e nao exigem Python no computador
