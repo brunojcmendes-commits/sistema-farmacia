@@ -21,6 +21,7 @@ NOME_INSTITUICAO = "Farmácia - Controle de Estoque"
 CATEGORIAS = [
     "Medicamentos Orais",
     "Medicamentos Injetáveis",
+    "Medicamentos Controlados",
     "Pomadas",
     "Outros",
     "Material/Medicamento Odontológico",
@@ -214,6 +215,30 @@ class EstoqueAPICliente:
         except requests.exceptions.RequestException: raise ErroConexao("Não foi possível editar o lote.")
         if r.status_code!=200: raise ErroConexao(r.json().get("erro","Erro ao editar lote."))
         return r.json()
+
+    def transferir_estoque(self,lote_id,destino,quantidade=0,mover_tudo=False):
+        try:r=requests.post(self._url('/estoque/transferir'),json={'lote_id':lote_id,'destino':destino,'quantidade':quantidade,'mover_tudo':mover_tudo},timeout=TIMEOUT_SEGUNDOS)
+        except requests.exceptions.RequestException:raise ErroConexao('Não foi possível transferir o estoque.')
+        if r.status_code!=200:raise ErroConexao(r.json().get('erro','Erro ao transferir estoque.'))
+        return r.json()
+
+    def listar_conferencias_semana(self,quantidade=5):
+        try:r=requests.get(self._url('/conferencias/semana'),params={'quantidade':quantidade},timeout=TIMEOUT_SEGUNDOS)
+        except requests.exceptions.RequestException:raise ErroConexao('Não foi possível consultar a conferência semanal.')
+        if r.status_code!=200:raise ErroConexao(r.json().get('erro','Erro ao consultar conferência.'))
+        return r.json()
+
+    def registrar_conferencia(self,cid,estoque_fisico,pg,nome_guerra,ajustar=False,observacao=''):
+        try:r=requests.post(self._url(f'/conferencias/{cid}'),json={'estoque_fisico':estoque_fisico,'pg':pg,'nome_guerra':nome_guerra,'ajustar':ajustar,'observacao':observacao},timeout=TIMEOUT_SEGUNDOS)
+        except requests.exceptions.RequestException:raise ErroConexao('Não foi possível registrar a conferência.')
+        if r.status_code!=200:raise ErroConexao(r.json().get('erro','Erro ao registrar conferência.'))
+        return r.json()
+
+    def listar_historico_conferencias(self):
+        try:r=requests.get(self._url('/conferencias/historico'),timeout=TIMEOUT_SEGUNDOS)
+        except requests.exceptions.RequestException:raise ErroConexao('Não foi possível consultar o histórico de conferências.')
+        if r.status_code!=200:raise ErroConexao(r.json().get('erro','Erro ao consultar histórico.'))
+        return r.json()['conferencias']
 
     def listar_lotes_excluidos(self):
         try: r=requests.get(self._url("/lotes-excluidos"),timeout=TIMEOUT_SEGUNDOS)
@@ -482,3 +507,11 @@ def gerar_pdf_resumo_consumo(caminho_pdf: str, titulo_filtros: str, registros: l
     total=sum(item['quantidade_total'] for item in resumo)
     lines.append(f'{len(resumo)} medicamento(s)/material(is) — {total} unidade(s) retiradas — gerado em {datetime.now().strftime(FORMATO_DATA_HORA)}')
     _write_simple_pdf(caminho_pdf,'FARMÁCIA - RESUMO DE CONSUMO',lines)
+
+def gerar_pdf_conferencias(caminho_pdf: str, registros: list):
+    lines=['Semana | Data | Categoria | Medicamento | Ficha | Virtual | Físico | Diferença | Resultado | Conferente']
+    for r in registros:
+        lines.append(f"{r.get('semana','')} | {r.get('conferido_em','')} | {r.get('categoria','')} | {r.get('medicamento','')} | {r.get('ficha','')} | {r.get('estoque_virtual','')} | {r.get('estoque_fisico','')} | {r.get('diferenca','')} | {r.get('resultado','')} | {r.get('pg','')} {r.get('nome_guerra','')}")
+    ok=sum(1 for r in registros if r.get('resultado')=='OK');div=sum(1 for r in registros if r.get('resultado') in ('DIVERGENTE','AJUSTADO'))
+    lines.append(f'Total: {len(registros)} | Sem divergência: {ok} | Com divergência: {div} | Gerado em {datetime.now().strftime(FORMATO_DATA_HORA)}')
+    _write_simple_pdf(caminho_pdf,'FARMÁCIA - RELATÓRIO DE CONFERÊNCIA FÍSICA',lines)
