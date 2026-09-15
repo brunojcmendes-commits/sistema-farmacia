@@ -11,7 +11,8 @@ DefaultDirName={localappdata}\Programs\SistemaFarmacia
 DefaultGroupName=Sistema Farmácia
 PrivilegesRequired=lowest
 OutputDir=Saida
-OutputBaseFilename=Sistema_Farmacia_Setup_1.3.2nFile=Arquivos_do_Programa\Gerente_Farmacia.ico
+OutputBaseFilename=Sistema_Farmacia_Setup_1.3.2
+SetupIconFile=Arquivos_do_Programa\Gerente_Farmacia.ico
 UninstallDisplayIcon={app}\Gerente_Farmacia.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -23,10 +24,12 @@ RestartApplications=no
 UsePreviousAppDir=yes
 DisableProgramGroupPage=yes
 AllowNoIcons=no
-VersionInfoVersion=1.3.2.0rsionInfoCompany=9º Batalhão de Saúde
+VersionInfoVersion=1.3.2.0
+VersionInfoCompany=9º Batalhão de Saúde
 VersionInfoDescription=Gerente Farmácia e Cliente Farmácia
 VersionInfoProductName=Sistema Farmácia
-VersionInfoProductVersion=1.3.2rsionInfoCopyright=9º Batalhão de Saúde
+VersionInfoProductVersion=1.3.2
+VersionInfoCopyright=9º Batalhão de Saúde
 
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
