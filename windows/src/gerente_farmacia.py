@@ -23,11 +23,11 @@ from farmacia_api import (
     COR_TEXTO, COR_BORDA, COR_FONTE_CABECALHO, COR_ERRO, COR_URGENTE,
     EstoqueAPICliente, ErroConexao,
     carregar_config, salvar_config, montar_url,
-    gerar_pdf_relatorio, gerar_pdf_resumo_consumo, tocar_bipe_local, chave_ordenacao_texto,
+    gerar_pdf_relatorio, gerar_pdf_resumo_consumo, gerar_pdf_conferencias, tocar_bipe_local, chave_ordenacao_texto,
 )
 
 INTERVALO_NOTIFICACOES_MS = 5000  # a cada 5s consulta se chegou pedido novo
-VERSAO_APP = "1.2.7"
+VERSAO_APP = "1.3.2"
 SERVIDOR_CENTRAL_PADRAO = "http://10.56.121.182:5000"
 
 def normalizar_data_interface(valor):
@@ -62,21 +62,175 @@ class BotaoArredondado(tk.Canvas):
         self.create_rectangle(r,1,w-r,h+1,fill=cor,outline=cor)
         self.create_text(w/2,(h+2)/2,text=self.texto,fill='white',font=('Segoe UI',9,'bold'))
 
+class BotaoAbaArredondada(tk.Canvas):
+    """Aba arredondada que mantém o texto legível no Linux."""
+    def __init__(self, parent, text, command):
+        super().__init__(parent, height=38, highlightthickness=0, bd=0,
+                         bg=COR_FUNDO, cursor="hand2")
+        self.texto = text.strip()
+        self.command = command
+        self.ativa = False
+        self.bind("<Configure>", self._desenhar)
+        self.bind("<Button-1>", lambda _e: self.command())
+        self.bind("<Enter>", lambda _e: self._desenhar(hover=True))
+        self.bind("<Leave>", self._desenhar)
+
+    def definir_ativa(self, ativa):
+        self.ativa = ativa
+        self._desenhar()
+
+    def definir_texto(self, texto):
+        self.texto = texto.strip()
+        self._desenhar()
+
+    def _desenhar(self, _event=None, hover=False):
+        self.delete("all")
+        w, h, r = max(self.winfo_width(), 100), 34, 13
+        cor = COR_PRIMARIA if self.ativa else (COR_PRIMARIA_HOVER if hover else COR_FUNDO_CARTAO)
+        fonte = "white" if self.ativa or hover else COR_TEXTO
+        self.create_arc(1, 1, 2*r, 2*r, start=90, extent=90, fill=cor, outline=COR_BORDA)
+        self.create_arc(w-2*r-1, 1, w-1, 2*r, start=0, extent=90, fill=cor, outline=COR_BORDA)
+        self.create_arc(1, h-2*r-1, 2*r, h-1, start=180, extent=90, fill=cor, outline=COR_BORDA)
+        self.create_arc(w-2*r-1, h-2*r-1, w-1, h-1, start=270, extent=90, fill=cor, outline=COR_BORDA)
+        self.create_rectangle(r, 1, w-r, h-1, fill=cor, outline=cor)
+        self.create_rectangle(1, r, w-1, h-r, fill=cor, outline=cor)
+        self.create_text(w/2, h/2, text=self.texto, fill=fonte,
+                         font=("Segoe UI", 8, "bold"), width=max(80, w-12))
+
+class AbasArredondadas(tk.Frame):
+    """Substitui o Notebook nativo e distribui as abas em duas linhas."""
+    def __init__(self, parent):
+        super().__init__(parent, bg=COR_FUNDO)
+        self.barra = tk.Frame(self, bg=COR_FUNDO)
+        self.barra.pack(fill="x", pady=(0, 6))
+        self.conteudo = tk.Frame(self, bg=COR_FUNDO)
+        self.conteudo.pack(fill="both", expand=True)
+        self._paginas, self._botoes, self._textos = [], [], []
+        self._ativa = None
+
+    def add(self, pagina, text=""):
+        if pagina in self._paginas:
+            return
+        indice = len(self._paginas)
+        self._paginas.append(pagina); self._textos.append(text)
+        botao = BotaoAbaArredondada(self.barra, text, lambda i=indice: self.select(i))
+        botao.grid(row=indice // 5, column=indice % 5, sticky="ew", padx=3, pady=3)
+        self.barra.grid_columnconfigure(indice % 5, weight=1, uniform="abas")
+        self._botoes.append(botao)
+        if self._ativa is None:
+            self.select(0)
+
+    def index(self, item):
+        return len(self._paginas) if item == "end" else self._resolver(item)
+
+    def tabs(self):
+        return tuple(str(pagina) for pagina in self._paginas)
+
+    def select(self, item=None):
+        if item is None:
+            return str(self._paginas[self._ativa]) if self._ativa is not None else ""
+        indice = self._resolver(item)
+        if self._ativa is not None:
+            self._paginas[self._ativa].pack_forget()
+            self._botoes[self._ativa].definir_ativa(False)
+        self._ativa = indice
+        self._paginas[indice].pack(fill="both", expand=True)
+        self._botoes[indice].definir_ativa(True)
+
+    def forget(self, item):
+        indice = self._resolver(item)
+        pagina = self._paginas.pop(indice); self._textos.pop(indice)
+        self._botoes.pop(indice).destroy(); pagina.pack_forget()
+        self._reorganizar()
+        self._ativa = None
+        if self._paginas: self.select(min(indice, len(self._paginas)-1))
+
+    def tab(self, item, **opcoes):
+        indice = self._resolver(item)
+        if "text" in opcoes:
+            self._textos[indice] = opcoes["text"]
+            self._botoes[indice].definir_texto(opcoes["text"])
+
+    def _resolver(self, item):
+        if isinstance(item, int): return item
+        if item in self._paginas: return self._paginas.index(item)
+        texto = str(item)
+        for i, pagina in enumerate(self._paginas):
+            if str(pagina) == texto: return i
+        raise tk.TclError("aba não encontrada")
+
+    def _reorganizar(self):
+        for i, botao in enumerate(self._botoes):
+            botao.command = lambda n=i: self.select(n)
+            botao.grid(row=i // 5, column=i % 5, sticky="ew", padx=3, pady=3)
+
 class CartaoPainel(tk.Canvas):
-    def __init__(self,parent,titulo,variavel,command,**kwargs):
-        super().__init__(parent,height=108,highlightthickness=0,bg=COR_FUNDO,cursor='hand2',**kwargs)
-        self.titulo=titulo;self.variavel=variavel;self.command=command
+    """Indicador grande do painel, com desenho vetorial e cantos arredondados."""
+    def __init__(self,parent,titulo,variavel,command,icone="caixas",**kwargs):
+        super().__init__(parent,height=170,highlightthickness=0,bg=COR_FUNDO,cursor='hand2',**kwargs)
+        self.titulo=titulo;self.variavel=variavel;self.command=command;self.icone=icone
         self.bind('<Configure>',self._desenhar);self.bind('<Button-1>',lambda e:self.command())
         self.variavel.trace_add('write',lambda *_:self._desenhar())
+
+    def _desenhar_icone(self, x, y, escala, cor):
+        """Ícones simples que independem de fontes ou bibliotecas externas."""
+        largura=max(2,int(escala/12))
+        if self.icone == "alerta":
+            self.create_polygon(x, y-escala*.55, x-escala*.55, y+escala*.45,
+                                x+escala*.55, y+escala*.45, outline=cor, fill="", width=largura)
+            self.create_line(x, y-escala*.23, x, y+escala*.13, fill=cor, width=largura)
+            self.create_oval(x-2, y+escala*.26-2, x+2, y+escala*.26+2, fill=cor, outline=cor)
+        elif self.icone == "pedido":
+            self.create_rectangle(x-escala*.38,y-escala*.5,x+escala*.27,y+escala*.48,
+                                  outline=cor,width=largura)
+            for deslocamento in (-.22, 0, .22):
+                self.create_line(x-escala*.25,y+escala*deslocamento,x+escala*.12,
+                                 y+escala*deslocamento,fill=cor,width=largura)
+            self.create_oval(x+escala*.05,y+escala*.08,x+escala*.55,y+escala*.58,
+                             outline=cor,width=largura)
+            self.create_line(x+escala*.30,y+escala*.19,x+escala*.30,y+escala*.34,
+                             fill=cor,width=largura)
+            self.create_line(x+escala*.30,y+escala*.34,x+escala*.41,y+escala*.39,
+                             fill=cor,width=largura)
+        elif self.icone == "frasco":
+            self.create_rectangle(x-escala*.25,y-escala*.48,x+escala*.25,y-escala*.32,
+                                  outline=cor,width=largura)
+            self.create_rectangle(x-escala*.34,y-escala*.30,x+escala*.34,y+escala*.48,
+                                  outline=cor,width=largura)
+            self.create_line(x-escala*.25,y,x+escala*.25,y,fill=cor,width=largura)
+            self.create_oval(x+escala*.20,y+escala*.06,x+escala*.62,y+escala*.45,
+                             outline=cor,width=largura)
+            self.create_line(x+escala*.30,y+escala*.36,x+escala*.53,y+escala*.14,
+                             fill=cor,width=largura)
+        elif self.icone == "vazio":
+            self.create_polygon(x-escala*.42,y-escala*.28,x,y-escala*.52,
+                                x+escala*.42,y-escala*.28,x,y-escala*.04,
+                                outline=cor,fill="",width=largura)
+            self.create_polygon(x-escala*.42,y-escala*.28,x-escala*.42,y+escala*.25,
+                                x,y+escala*.50,x,y-escala*.04,
+                                outline=cor,fill="",width=largura)
+            self.create_polygon(x,y-escala*.04,x+escala*.42,y-escala*.28,
+                                x+escala*.42,y+escala*.25,x,y+escala*.50,
+                                outline=cor,fill="",width=largura)
+        else:
+            tamanho=escala*.34
+            for dx,dy in ((-tamanho*.75,tamanho*.08),(tamanho*.75,tamanho*.08),(0,-tamanho*.62)):
+                self.create_rectangle(x+dx-tamanho/2,y+dy-tamanho/2,x+dx+tamanho/2,
+                                      y+dy+tamanho/2,outline=cor,width=largura)
+            self.create_line(x,y-tamanho*.10,x,y+tamanho*.40,fill=cor,width=largura)
+            self.create_line(x-tamanho*.75,y+tamanho*.08,x+tamanho*.75,y+tamanho*.08,
+                             fill=cor,width=largura)
+
     def _desenhar(self,event=None):
-        self.delete('all');w=max(self.winfo_width(),120);h=104;r=16;fill=COR_FUNDO_CARTAO
+        self.delete('all');w=max(self.winfo_width(),160);h=max(self.winfo_height()-4,130);r=18;fill=COR_FUNDO_CARTAO
         self.create_arc(1,1,2*r,2*r,start=90,extent=90,fill=fill,outline=COR_BORDA)
         self.create_arc(w-2*r-1,1,w-1,2*r,start=0,extent=90,fill=fill,outline=COR_BORDA)
         self.create_arc(1,h-2*r-1,2*r,h-1,start=180,extent=90,fill=fill,outline=COR_BORDA)
         self.create_arc(w-2*r-1,h-2*r-1,w-1,h-1,start=270,extent=90,fill=fill,outline=COR_BORDA)
         self.create_rectangle(r,1,w-r,h-1,fill=fill,outline=fill);self.create_rectangle(1,r,w-1,h-r,fill=fill,outline=fill)
-        self.create_text(w/2,30,text=self.titulo,fill=COR_TEXTO,font=('Segoe UI',9,'bold'),width=max(80,w-18))
-        self.create_text(w/2,70,text=self.variavel.get(),fill=COR_PRIMARIA,font=('Segoe UI',22,'bold'))
+        self._desenhar_icone(w/2,h*.27,min(46,h*.28),COR_DESTAQUE)
+        self.create_text(w/2,h*.57,text=self.titulo,fill=COR_TEXTO,font=('Segoe UI',11,'bold'),width=max(100,w-24))
+        self.create_text(w/2,h*.79,text=self.variavel.get(),fill=COR_DESTAQUE,font=('Segoe UI',28,'bold'))
 
 
 class App(tk.Tk):
@@ -182,28 +336,32 @@ class App(tk.Tk):
         BotaoArredondado(barra_acoes,text="Configurar servidor",command=self._configurar_servidor,width=140).pack(side="right")
         BotaoArredondado(barra_acoes,text="Testar conexão",command=self._testar_conexao_manual,width=115).pack(side="right",padx=(0,6))
 
-        notebook = ttk.Notebook(self)
+        notebook = AbasArredondadas(self)
         notebook.pack(fill="both", expand=True, padx=12, pady=12)
 
-        aba_dashboard = ttk.Frame(notebook, style="TFrame")
-        aba_cadastro = ttk.Frame(notebook, style="TFrame")
-        aba_pedidos = ttk.Frame(notebook, style="TFrame")
-        aba_historico = ttk.Frame(notebook, style="TFrame")
-        aba_alertas = ttk.Frame(notebook, style="TFrame")
-        aba_apoio = ttk.Frame(notebook, style="TFrame")
-        aba_excluidos = ttk.Frame(notebook, style="TFrame")
-        self.aba_auditoria = ttk.Frame(notebook,style="TFrame")
-        notebook.add(aba_dashboard, text="  Painel  ")
+        aba_dashboard = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_cadastro = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_pedidos = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_historico = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_alertas = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_apoio = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_controlados = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_conferencias = ttk.Frame(notebook.conteudo, style="TFrame")
+        aba_excluidos = ttk.Frame(notebook.conteudo, style="TFrame")
+        self.aba_auditoria = ttk.Frame(notebook.conteudo,style="TFrame")
+        notebook.add(aba_dashboard, text="Painel")
         self.aba_lotes_index = notebook.index("end")
-        notebook.add(aba_cadastro, text="  Lotes  ")
+        notebook.add(aba_cadastro, text="Lotes")
         self.aba_pedidos_index = notebook.index("end")
-        notebook.add(aba_pedidos, text="  Pedidos  ")
-        notebook.add(aba_historico, text="  Histórico e Relatórios  ")
+        notebook.add(aba_pedidos, text="Pedidos")
+        notebook.add(aba_historico, text="Histórico e Relatórios")
         self.aba_alertas_index = notebook.index("end")
-        notebook.add(aba_alertas, text="  Alertas de Validade  ")
+        notebook.add(aba_alertas, text="Alertas de Validade")
         self.aba_externos_index = notebook.index("end")
-        notebook.add(aba_apoio, text="  Lotes Externos  ")
-        notebook.add(aba_excluidos, text="  Lotes Excluídos  ")
+        notebook.add(aba_apoio, text="Lotes Externos")
+        notebook.add(aba_controlados, text="Medicamentos Controlados")
+        notebook.add(aba_conferencias, text="Conferência Semanal")
+        notebook.add(aba_excluidos, text="Lotes Excluídos")
         self.notebook = notebook
 
         self._montar_aba_dashboard(aba_dashboard)
@@ -212,6 +370,8 @@ class App(tk.Tk):
         self._montar_aba_historico(aba_historico)
         self._montar_aba_alertas(aba_alertas)
         self._montar_aba_apoio(aba_apoio)
+        self._montar_aba_controlados(aba_controlados)
+        self._montar_aba_conferencias(aba_conferencias)
         self._montar_aba_excluidos(aba_excluidos)
         self._montar_aba_auditoria(self.aba_auditoria)
 
@@ -224,12 +384,18 @@ class App(tk.Tk):
         ttk.Label(topo,text="Visão geral do estoque",style="Cartao.TLabel",font=("Segoe UI",14,"bold")).pack(side="left")
         ttk.Button(topo,text="Atualizar painel",command=self._atualizar_dashboard).pack(side="right")
         ttk.Button(topo,text="Criar backup",style="Secundario.TButton",command=self._backup).pack(side="right",padx=8)
-        self.dashboard_cards=tk.Frame(aba,bg=COR_FUNDO); self.dashboard_cards.pack(fill="x",padx=8,pady=8)
+        self.dashboard_cards=tk.Frame(aba,bg=COR_FUNDO); self.dashboard_cards.pack(fill="both",expand=True,padx=8,pady=(0,8))
         self.dashboard_vars=[tk.StringVar(value="—") for _ in range(5)]
         titulos=["Lotes cadastrados","Lotes sem estoque","Validades críticas","Pedidos pendentes","Lotes externos / críticos"]
         comandos=[self._abrir_lotes_dashboard,self._mostrar_lotes_sem_estoque,self._abrir_validades_dashboard,self._abrir_pedidos_dashboard,self._abrir_externos_dashboard]
+        icones=["caixas","vazio","alerta","pedido","frasco"]
+        posicoes=[(0,0,2),(0,2,2),(0,4,2),(1,0,3),(1,3,3)]
+        for coluna in range(6):self.dashboard_cards.grid_columnconfigure(coluna,weight=1,uniform="painel")
+        for linha in range(2):self.dashboard_cards.grid_rowconfigure(linha,weight=1,uniform="painel")
         for i,(t,cmd) in enumerate(zip(titulos,comandos)):
-            c=CartaoPainel(self.dashboard_cards,t,self.dashboard_vars[i],cmd);c.grid(row=0,column=i,sticky="nsew",padx=5);self.dashboard_cards.grid_columnconfigure(i,weight=1)
+            linha,coluna,span=posicoes[i]
+            c=CartaoPainel(self.dashboard_cards,t,self.dashboard_vars[i],cmd,icone=icones[i])
+            c.grid(row=linha,column=coluna,columnspan=span,sticky="nsew",padx=5,pady=5)
         self._atualizar_dashboard()
 
     def _atualizar_dashboard(self):
@@ -555,6 +721,13 @@ class App(tk.Tk):
         for i,(rot,val) in enumerate(campos):
             ttk.Label(janela,text=rot,style="Cartao.TLabel").grid(row=i,column=0,sticky="w",padx=12,pady=6)
             v=tk.StringVar(value=str(val)); vars_.append(v); ttk.Entry(janela,textvariable=v,width=34).grid(row=i,column=1,padx=12,pady=6)
+        mover_controlado=tk.BooleanVar();mover_externo=tk.BooleanVar();mover_tudo=tk.BooleanVar();qtd_mover=tk.StringVar()
+        ttk.Separator(janela).grid(row=6,column=0,columnspan=2,sticky='ew',padx=12,pady=6)
+        ttk.Checkbutton(janela,text='Mover para Medicamentos Controlados',variable=mover_controlado).grid(row=7,column=0,columnspan=2,sticky='w',padx=12)
+        ttk.Checkbutton(janela,text='Mover para Medicamentos/Materiais Externos',variable=mover_externo).grid(row=8,column=0,columnspan=2,sticky='w',padx=12)
+        ttk.Label(janela,text='Quantidade a mover',style='Cartao.TLabel').grid(row=9,column=0,sticky='w',padx=12,pady=6)
+        ttk.Entry(janela,textvariable=qtd_mover,width=18).grid(row=9,column=1,sticky='w',padx=12,pady=6)
+        ttk.Checkbutton(janela,text='Mover todo o estoque disponível',variable=mover_tudo).grid(row=10,column=0,columnspan=2,sticky='w',padx=12)
         def salvar():
             try:
                 comp=int(vars_[2].get()) if vars_[2].get().strip() else None
@@ -562,11 +735,85 @@ class App(tk.Tk):
                 if vars_[3].get().strip(): datetime.strptime(vars_[3].get().strip(),FORMATO_DATA)
                 ni=float(vars_[4].get().replace(",",".")); na=float(vars_[5].get().replace(",","."))
                 self.api.editar_lote(categoria,medicamento,ficha,validade,vars_[0].get().strip(),vars_[1].get().strip(),vars_[3].get().strip(),ni,na,comp,lote_id)
+                destinos=int(mover_controlado.get())+int(mover_externo.get())
+                if destinos>1:raise ValueError('Selecione somente um destino para a movimentação.')
+                if destinos:
+                    qtd=0 if mover_tudo.get() else float(qtd_mover.get().replace(',','.'))
+                    self.api.transferir_estoque(lote_id,'controlados' if mover_controlado.get() else 'externos',qtd,mover_tudo.get())
             except ValueError: messagebox.showerror("Erro","Verifique data e estoques.",parent=janela); return
             except ErroConexao as e: messagebox.showerror("Erro",str(e),parent=janela); return
             janela.destroy(); self._atualizar_lista_lotes(categoria,self.var_busca_lote.get().strip()); messagebox.showinfo("Sucesso","Lote atualizado.")
-        ttk.Button(janela,text="← Voltar / Fechar",style="Secundario.TButton",command=janela.destroy).grid(row=6,column=0,pady=12,padx=(12,6),sticky="ew")
-        ttk.Button(janela,text="Salvar alterações",command=salvar).grid(row=6,column=1,pady=12,padx=(6,12),sticky="ew")
+        ttk.Button(janela,text="← Voltar / Fechar",style="Secundario.TButton",command=janela.destroy).grid(row=11,column=0,pady=12,padx=(12,6),sticky="ew")
+        ttk.Button(janela,text="Salvar alterações",command=salvar).grid(row=11,column=1,pady=12,padx=(6,12),sticky="ew")
+
+    def _montar_aba_controlados(self,aba):
+        topo=ttk.Frame(aba,style='Cartao.TFrame',padding=12);topo.pack(fill='x',padx=8,pady=8)
+        ttk.Label(topo,text='Medicamentos Controlados',style='Cartao.TLabel',font=('Segoe UI',13,'bold')).pack(side='left')
+        ttk.Button(topo,text='Atualizar',command=self._buscar_controlados).pack(side='right')
+        tabela=ttk.Frame(aba);tabela.pack(fill='both',expand=True,padx=8,pady=(0,8))
+        cols=('medicamento','ficha','validade','inicial','atual');self.tree_controlados=ttk.Treeview(tabela,columns=cols,show='headings')
+        for c,t,w in zip(cols,['Medicamento','Ficha','Validade','Estoque Inicial','Estoque Atual'],[330,110,120,120,120]):self.tree_controlados.heading(c,text=t);self.tree_controlados.column(c,width=w,anchor='center')
+        configurar_rolagem_tabela(tabela,self.tree_controlados)
+        self.tree_controlados.bind('<Double-1>',lambda e:self._abrir_controlado_para_edicao())
+
+    def _buscar_controlados(self):
+        if not self.api:return
+        for iid in self.tree_controlados.get_children():self.tree_controlados.delete(iid)
+        try:lotes=self.api.listar_lotes('Medicamentos Controlados')
+        except ErroConexao as e:messagebox.showerror('Controlados',str(e));return
+        for l in lotes:self.tree_controlados.insert('','end',iid=str(l['id']),values=(l['medicamento'],l['ficha'],l.get('validade') or '-',l['estoque_inicial'],l['estoque_atual']))
+
+    def _abrir_controlado_para_edicao(self):
+        sel=self.tree_controlados.selection()
+        if not sel:return
+        self.var_categoria.set('Medicamentos Controlados');self._atualizar_lista_lotes('Medicamentos Controlados');self.notebook.select(self.aba_lotes_index)
+        if self.tree_lotes.exists(sel[0]):self.tree_lotes.selection_set(sel[0]);self.tree_lotes.focus(sel[0]);self.tree_lotes.see(sel[0]);self._editar_lote_selecionado()
+
+    def _montar_aba_conferencias(self,aba):
+        topo=ttk.Frame(aba,style='Cartao.TFrame',padding=12);topo.pack(fill='x',padx=8,pady=8)
+        ttk.Label(topo,text='Conferência física semanal — 5 lotes sugeridos',style='Cartao.TLabel',font=('Segoe UI',12,'bold')).grid(row=0,column=0,columnspan=4,sticky='w')
+        ttk.Label(topo,text='P/G:',style='Cartao.TLabel').grid(row=1,column=0,pady=(10,0));self.var_conf_pg=tk.StringVar();ttk.Entry(topo,textvariable=self.var_conf_pg,width=15).grid(row=1,column=1,padx=6,pady=(10,0))
+        ttk.Label(topo,text='Nome de Guerra:',style='Cartao.TLabel').grid(row=1,column=2,pady=(10,0));self.var_conf_nome=tk.StringVar();ttk.Entry(topo,textvariable=self.var_conf_nome,width=26).grid(row=1,column=3,padx=6,pady=(10,0))
+        ttk.Button(topo,text='Atualizar sugestões',command=self._buscar_conferencias).grid(row=1,column=4,padx=8,pady=(10,0))
+        tabela=ttk.Frame(aba);tabela.pack(fill='both',expand=True,padx=8)
+        cols=('categoria','medicamento','ficha','validade','virtual','fisico','resultado');self.tree_conferencias=ttk.Treeview(tabela,columns=cols,show='headings',selectmode='browse')
+        for c,t,w in zip(cols,['Categoria','Medicamento','Ficha','Validade','Virtual','Físico','Resultado'],[170,260,90,100,85,85,120]):self.tree_conferencias.heading(c,text=t);self.tree_conferencias.column(c,width=w,anchor='center')
+        configurar_rolagem_tabela(tabela,self.tree_conferencias)
+        rodape=ttk.Frame(aba);rodape.pack(fill='x',padx=8,pady=8)
+        ttk.Button(rodape,text='Lote OK',command=lambda:self._conferir_lote(False)).pack(side='left')
+        ttk.Button(rodape,text='Alterar lote pela quantidade física',style='Secundario.TButton',command=lambda:self._conferir_lote(True)).pack(side='left',padx=8)
+        ttk.Button(rodape,text='Gerar relatório PDF',command=self._relatorio_conferencias).pack(side='right')
+        self.lbl_conferencias=ttk.Label(rodape,text='');self.lbl_conferencias.pack(side='right',padx=12)
+
+    def _buscar_conferencias(self):
+        if not self.api:return
+        try:dados=self.api.listar_conferencias_semana(5)
+        except ErroConexao as e:messagebox.showerror('Conferência',str(e));return
+        for iid in self.tree_conferencias.get_children():self.tree_conferencias.delete(iid)
+        for r in dados['conferencias']:self.tree_conferencias.insert('','end',iid=str(r['id']),values=(r['categoria'],r['medicamento'],r.get('ficha') or '',r.get('validade') or '-',r['estoque_virtual'],'' if r.get('estoque_fisico') is None else r['estoque_fisico'],r['resultado']))
+        pend=sum(1 for r in dados['conferencias'] if r['resultado']=='PENDENTE');self.lbl_conferencias.configure(text=f"Semana {dados['semana']} — {pend} pendente(s)")
+
+    def _conferir_lote(self,ajustar):
+        sel=self.tree_conferencias.selection()
+        if not sel:messagebox.showwarning('Conferência','Selecione um lote.');return
+        pg=self.var_conf_pg.get().strip();nome=self.var_conf_nome.get().strip()
+        if not pg or not nome:messagebox.showwarning('Conferência','Informe P/G e Nome de Guerra.');return
+        v=self.tree_conferencias.item(sel[0],'values');fisico=simpledialog.askfloat('Contagem física',f"Informe a quantidade física encontrada para:\n{v[1]} — ficha {v[2]}",parent=self,minvalue=0)
+        if fisico is None:return
+        virtual=float(v[4])
+        if not ajustar and fisico!=virtual:messagebox.showwarning('Divergência',f'O físico ({fisico:g}) não confere com o virtual ({virtual:g}). Use “Alterar lote”.');return
+        obs=simpledialog.askstring('Observação','Observação da conferência (opcional):',parent=self) or ''
+        if ajustar and fisico!=virtual and not messagebox.askyesno('Confirmar ajuste',f'Alterar o estoque virtual de {virtual:g} para {fisico:g}?'):return
+        try:r=self.api.registrar_conferencia(int(sel[0]),fisico,pg,nome,ajustar,obs)
+        except ErroConexao as e:messagebox.showerror('Conferência',str(e));return
+        self._buscar_conferencias();self._atualizar_dashboard();messagebox.showinfo('Conferência',f"Resultado registrado: {r['resultado']}.")
+
+    def _relatorio_conferencias(self):
+        try:registros=self.api.listar_historico_conferencias()
+        except ErroConexao as e:messagebox.showerror('Relatório',str(e));return
+        if not registros:messagebox.showwarning('Relatório','Ainda não há conferências concluídas.');return
+        caminho=filedialog.asksaveasfilename(initialdir=PASTA_COMPROVANTES,initialfile=f"conferencias_{datetime.now().strftime('%Y%m%d')}.pdf",defaultextension='.pdf',filetypes=[('PDF','*.pdf')])
+        if caminho:gerar_pdf_conferencias(caminho,registros);messagebox.showinfo('Relatório',f'Salvo em:\n{caminho}')
 
     def _cadastrar_lote(self):
         if not self._servidor_configurado():
