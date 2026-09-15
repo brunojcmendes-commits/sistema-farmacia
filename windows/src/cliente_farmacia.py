@@ -25,7 +25,7 @@ from farmacia_api import (
     gerar_pdf_comprovante_pedido,
 )
 
-VERSAO_APP="1.2.7"
+VERSAO_APP = "1.3.2"
 SERVIDOR_CENTRAL_PADRAO="http://10.56.121.182:5000"
 POSTOS_GRADUACOES=["Sd Ev","Sd","Cb","3º Sgt","2º Sgt","1º Sgt","ST","Asp","2º Ten","1º Ten","Cap","Maj","TC","Cel","Gen"]
 
