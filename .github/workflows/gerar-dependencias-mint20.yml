@@ -1,0 +1,39 @@
+name: Gerar dependencias offline Mint 20.3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "main"
+    paths:
+      - ".github/workflows/gerar-dependencias-mint20.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dependencias:
+    name: Baixar pacotes Ubuntu 20.04
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Preparar dependencias do Mint 20.3
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/dependencias"
+          docker run --rm -v "$GITHUB_WORKSPACE/dependencias:/saida" ubuntu:20.04 bash -c '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            cd /saida
+            apt-get download python3-tk blt tk8.6-blt2.5 libtcl8.6 libtk8.6
+            chmod 644 ./*.deb
+          '
+          ls -lh "$GITHUB_WORKSPACE/dependencias"
+
+      - name: Publicar dependencias
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dependencias-Mint-20.3-amd64
+          path: dependencias/*.deb
+          if-no-files-found: error
+          retention-days: 7
