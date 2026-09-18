@@ -161,13 +161,15 @@ class App(legado.App):
 
         self._area_graficos=tk.Frame(aba,bg=legado.COR_FUNDO)
         self._area_graficos.pack(fill="both",expand=True,padx=8,pady=(0,8))
-        for c in range(3):self._area_graficos.grid_columnconfigure(c,weight=1,uniform="graficos")
+        for c in range(2):self._area_graficos.grid_columnconfigure(c,weight=1,uniform="graficos")
         self.grafico_validade=GraficoCanvas(self._area_graficos,"Situação das validades")
         self.grafico_mov=GraficoCanvas(self._area_graficos,"Movimentações — últimos 7 dias")
         self.grafico_saida=GraficoCanvas(self._area_graficos,"Itens com maior saída")
+        self.grafico_solicitados=GraficoCanvas(self._area_graficos,"Medicamentos mais solicitados")
         self.grafico_validade.grid(row=0,column=0,sticky="nsew",padx=(0,5),pady=5)
-        self.grafico_mov.grid(row=0,column=1,sticky="nsew",padx=5,pady=5)
-        self.grafico_saida.grid(row=0,column=2,sticky="nsew",padx=(5,0),pady=5)
+        self.grafico_mov.grid(row=0,column=1,sticky="nsew",padx=(5,0),pady=5)
+        self.grafico_saida.grid(row=1,column=0,sticky="nsew",padx=(0,5),pady=5)
+        self.grafico_solicitados.grid(row=1,column=1,sticky="nsew",padx=(5,0),pady=5)
 
     @staticmethod
     def _quantidade_lote(lote):
@@ -209,6 +211,32 @@ class App(legado.App):
         serie=[(d.strftime("%d/%m"),por_dia[d]) for d in dias]
         return serie,saidas.most_common(6)
 
+    def _dados_mais_solicitados(self):
+        """Soma as quantidades pedidas por medicamento/produto no histórico de pedidos."""
+        try:pedidos=self.api.listar_pedidos()
+        except Exception:return []
+        totais=Counter()
+        for p in pedidos or []:
+            for item in p.get("itens",[]) or []:
+                nome=item.get("medicamento") or item.get("Medicamento") or item.get("produto") or item.get("Produto")
+                qtd=item.get("quantidade") or item.get("quantidade_retirada") or item.get("Quantidade") or 0
+                try:q=float(qtd or 0)
+                except Exception:q=0
+                if nome:totais[str(nome)]+=abs(q)
+        # Fallback: usa movimentações de saída quando o endpoint de pedidos não devolve itens históricos.
+        if not totais:
+            try:movs=self.api.buscar_movimentacoes()
+            except Exception:movs=[]
+            for m in movs or []:
+                tipo=str(m.get("Tipo") or m.get("tipo") or "").casefold()
+                qtd=m.get("Retirada") or m.get("quantidade_retirada") or m.get("Quantidade") or m.get("quantidade") or 0
+                try:q=float(qtd or 0)
+                except Exception:q=0
+                if "sa" in tipo or q>0:
+                    nome=m.get("Medicamento") or m.get("medicamento") or m.get("Material") or m.get("produto")
+                    if nome:totais[str(nome)]+=abs(q)
+        return totais.most_common(8)
+
     def _atualizar_dashboard(self):
         if not self.api:return
         try:
@@ -238,6 +266,7 @@ class App(legado.App):
                 serie,saidas=self._dados_movimentacoes()
                 self.grafico_mov.atualizar(serie,"linha")
                 self.grafico_saida.atualizar(saidas)
+                self.grafico_solicitados.atualizar(self._dados_mais_solicitados())
         except Exception:
             # Mantém o Gestor utilizável mesmo se um endpoint analítico estiver indisponível.
             try:super()._atualizar_dashboard()
