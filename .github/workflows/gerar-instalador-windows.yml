@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "sistfarma-1.4.0-dashboard"
     tags:
       - "v*"
 
@@ -39,7 +40,8 @@ jobs:
             --name "Gerente_Farmacia" `
             --icon "Gerente_Farmacia.ico" `
             --add-data "Gerente_Farmacia.png;." `
-            gerente_farmacia.py
+            --hidden-import "gerente_farmacia" `
+            gerente_farmacia_140.py
           pyinstaller --noconfirm --clean --windowed --onefile `
             --name "Cliente_Farmacia" `
             --icon "Cliente_Farmacia.ico" `
@@ -70,7 +72,7 @@ jobs:
       - name: Publicar instalador para download
         uses: actions/upload-artifact@v4
         with:
-          name: Sistema-Farmacia-Windows-1.3.2
-          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.3.2.exe
+          name: Sistema-Farmacia-Windows-1.4.0
+          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.0.exe
           if-no-files-found: error
           retention-days: 30
