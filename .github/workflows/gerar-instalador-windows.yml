@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "sistfarma-1.4.0-dashboard"
     tags:
       - "v*"
 
