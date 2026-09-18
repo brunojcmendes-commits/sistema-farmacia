@@ -117,7 +117,7 @@ class App(legado.App):
             ("Conferência",lambda:self._abrir_area("confer")),
             ("Auditoria",self._abrir_auditoria),
             ("Usuários",self._abrir_usuarios),
-            ("Relatórios",lambda:self._abrir_area("histórico","relatórios")),
+            ("Relatórios",self._abrir_relatorios_consumo),
             ("Configurações",self._configurar_servidor),
         ]
         self._botoes_menu={}
@@ -129,6 +129,14 @@ class App(legado.App):
             b.pack(fill="x",padx=7,pady=1)
             self._botoes_menu[nome]=b
         self._atualizar_menu_permissoes()
+
+    def _abrir_relatorios_consumo(self):
+        """Centraliza os relatórios de consumo usando a tela de movimentações já validada."""
+        self._abrir_area("histórico","relatórios")
+        try:
+            self._buscar_historico()
+        except Exception:
+            pass
 
     def _atualizar_menu_permissoes(self):
         b=getattr(self,"_botoes_menu",{}).get("Auditoria")
