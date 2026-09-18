@@ -153,6 +153,12 @@ class App(legado.App):
         super()._logout()
         self._atualizar_menu_permissoes()
 
+    def _abrir_auditoria(self):
+        # Mantém a regra: Auditoria é exclusiva do perfil Gerente.
+        if not self.usuario_logado or self.usuario_logado.get("perfil")!="gerente":
+            return
+        return super()._abrir_auditoria()
+
     def _instalar_dashboard_analitico(self):
         indice=self._indice_por_nome("painel")
         if indice is None:return
