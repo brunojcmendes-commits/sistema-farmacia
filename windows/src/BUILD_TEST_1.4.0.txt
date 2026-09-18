@@ -1,0 +1,4 @@
+SISTFARMA 1.4.0 - BUILD DE TESTE
+Solicitação de compilação para validação Windows.
+Branch: sistfarma-1.4.0-dashboard
+Objetivo: gerar Sistema_Farmacia_Setup_1.4.0.exe e validar dashboard, gráficos, auditoria e relatórios de consumo.
