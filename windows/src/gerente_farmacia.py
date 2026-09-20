@@ -28,7 +28,7 @@ from farmacia_api import (
 
 INTERVALO_NOTIFICACOES_MS = 5000  # a cada 5s consulta se chegou pedido novo
 VERSAO_APP = "1.3.2"
-SERVIDOR_CENTRAL_PADRAO = "http://10.56.121.182:5000"
+SERVIDOR_CENTRAL_PADRAO = "http://10.56.121.242:5000"
 
 def normalizar_data_interface(valor):
     """Aceita data brasileira ou ISO e sempre devolve dd/mm/aaaa."""
@@ -1209,7 +1209,7 @@ class App(tk.Tk):
         endereco = simpledialog.askstring(
             "Endereço do servidor",
             "Informe o endereço do computador-servidor (IP mostrado na janela do servidor).\n"
-            "Servidor central: 10.56.121.182:5000",
+            "Servidor central: 10.56.121.242:5000",
             initialvalue=atual.replace("http://", "").replace("https://", ""),
             parent=self,
         )
