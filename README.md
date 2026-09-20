@@ -20,5 +20,5 @@ Gerente Farmacia e Cliente Farmacia.
 
 O servidor nao faz parte deste instalador. Os aplicativos usam por padrao:
 
-`http://10.56.121.182:5000`
+`http://10.56.121.242:5000`
 
