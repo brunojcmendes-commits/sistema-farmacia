@@ -46,7 +46,8 @@ jobs:
             --name "Cliente_Farmacia" `
             --icon "Cliente_Farmacia.ico" `
             --add-data "Cliente_Farmacia.png;." `
-            cliente_farmacia.py
+            --add-data "../web-cliente;web-cliente" `
+            cliente_html.py
           Pop-Location
 
       - name: Preparar arquivos do instalador
