@@ -40,8 +40,8 @@ jobs:
             --name "Gerente_Farmacia" `
             --icon "Gerente_Farmacia.ico" `
             --add-data "Gerente_Farmacia.png;." `
-            --hidden-import "gerente_farmacia" `
-            gerente_farmacia_140.py
+            --add-data "../web;web" `
+            gestor_html.py
           pyinstaller --noconfirm --clean --windowed --onefile `
             --name "Cliente_Farmacia" `
             --icon "Cliente_Farmacia.ico" `
