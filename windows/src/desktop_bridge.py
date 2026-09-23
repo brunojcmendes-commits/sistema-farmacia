@@ -15,7 +15,7 @@ import time
 from urllib import error, parse, request
 import webbrowser
 
-VERSION = '1.4.1'
+VERSION = '1.4.2'
 DEFAULT_SERVER = 'http://10.56.121.242:5000'
 
 
@@ -150,9 +150,9 @@ class Bridge:
             if not self.user or self.user.get('perfil') != 'gerente':
                 return 403, {'erro': 'Acesso exclusivo ao Gerente.'}
         allowed = {
-            'GET': r'/(categorias|medicamentos|lotes|apoio|apoio/alertas|lotes-excluidos|historico|alertas|pedidos|pedidos/\d+|conferencias/semana|conferencias/historico|auditoria|usuarios|notificacoes)',
-            'POST': r'/(retiradas|itens|apoio|estoque/transferir|conferencias/\d+|pedidos/\d+/(status|conferir)|usuarios|usuarios/\d+/ativo|minha-senha|backup)',
-            'PUT': r'/itens', 'DELETE': r'/(itens|apoio)',
+            'GET': r'/(recebimentos|recebimentos/historico|categorias|medicamentos|lotes|apoio|apoio/alertas|lotes-excluidos|historico|alertas|pedidos|pedidos/\d+|conferencias/semana|conferencias/historico|auditoria|usuarios|notificacoes)',
+            'POST': r'/(recebimentos|recebimentos/liberar|retiradas|itens|apoio|estoque/transferir|conferencias/\d+|pedidos/\d+/(status|conferir)|usuarios|usuarios/\d+/ativo|minha-senha|backup)',
+            'PUT': r'/(itens|recebimentos/\d+)', 'DELETE': r'/(itens|apoio|recebimentos/\d+)',
         }
         if method not in allowed or not re.fullmatch(allowed[method], endpoint):
             return 404, {'erro': 'Operação não disponível.'}

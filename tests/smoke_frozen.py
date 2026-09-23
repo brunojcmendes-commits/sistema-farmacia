@@ -20,7 +20,7 @@ for name in ('Gerente_Farmacia.exe','Cliente_Farmacia.exe'):
                 break
             except OSError:time.sleep(.25)
         else:raise RuntimeError(name+' nao iniciou')
-        for asset,marker in [('bootstrap.js',b'1.4.1'),('app.js',b'renderDashboard'),('data.js',b'stockMetrics'),('app.css',b'.sidebar'),('brand.svg',b'<svg')]:
+        for asset,marker in [('bootstrap.js',b'1.4.2'),('app.js',b'renderDashboard'),('data.js',b'stockMetrics'),('app.css',b'.sidebar'),('brand.svg',b'<svg')]:
             with urlopen(f'http://127.0.0.1:{port}/{asset}',timeout=3) as r:assert marker in r.read(),asset
         print(name+': executavel e recursos internos OK')
     finally:
