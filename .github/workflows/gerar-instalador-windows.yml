@@ -28,6 +28,14 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-build.txt
 
+      - name: Testar calculos e ponte local
+        shell: powershell
+        run: |
+          python -m unittest discover -s tests -p "test_*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw "Falha nos testes Python." }
+          node tests/test_dashboard.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Falha nos testes do painel." }
+
       - name: Instalar o compilador dos aplicativos
         shell: powershell
         run: python -m pip install "pyinstaller>=6,<7"
@@ -46,7 +54,7 @@ jobs:
             --name "Cliente_Farmacia" `
             --icon "Cliente_Farmacia.ico" `
             --add-data "Cliente_Farmacia.png;." `
-            --add-data "../web-cliente;web-cliente" `
+            --add-data "../web;web" `
             cliente_html.py
           Pop-Location
 
@@ -58,6 +66,10 @@ jobs:
           Copy-Item "windows/src/dist/Cliente_Farmacia.exe" "windows/installer/Arquivos_do_Programa/"
           Copy-Item "windows/src/Gerente_Farmacia.ico" "windows/installer/Arquivos_do_Programa/"
           Copy-Item "windows/src/Cliente_Farmacia.ico" "windows/installer/Arquivos_do_Programa/"
+
+      - name: Testar executaveis empacotados
+        shell: powershell
+        run: python tests/smoke_frozen.py windows/installer/Arquivos_do_Programa
 
       - name: Instalar Inno Setup
         shell: powershell
@@ -73,7 +85,7 @@ jobs:
       - name: Publicar instalador para download
         uses: actions/upload-artifact@v4
         with:
-          name: Sistema-Farmacia-Windows-1.4.0
-          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.0.exe
+          name: Sistema-Farmacia-Windows-1.4.1
+          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.1.exe
           if-no-files-found: error
           retention-days: 30
