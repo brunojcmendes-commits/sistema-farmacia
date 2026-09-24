@@ -240,14 +240,14 @@ class InstallerTests(unittest.TestCase):
             marker = "if __name__=='__main__':iniciar_servidor()"
             source.write_text(original.decode().replace(marker, previous+marker), encoding='utf-8')
             module.atualizar(root)
-            self.assertIn(module.START, source.read_text())
-            self.assertNotIn('SISCOFIS 1.4.2', source.read_text())
+            self.assertIn(module.START, source.read_text(encoding='utf-8'))
+            self.assertNotIn('SISCOFIS 1.4.2', source.read_text(encoding='utf-8'))
             module.atualizar(root, remove=True)
             self.assertEqual(source.read_bytes(), original)
-            source.write_text('unsupported server')
+            source.write_text('unsupported server', encoding='utf-8')
             with self.assertRaises(RuntimeError):
                 module.atualizar(root)
-            self.assertEqual(source.read_text(), 'unsupported server')
+            self.assertEqual(source.read_text(encoding='utf-8'), 'unsupported server')
 
 
 if __name__ == '__main__':
