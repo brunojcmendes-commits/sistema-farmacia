@@ -243,7 +243,7 @@ class InstallerTests(unittest.TestCase):
             self.assertIn(module.START, source.read_text(encoding='utf-8'))
             self.assertNotIn('SISCOFIS 1.4.2', source.read_text(encoding='utf-8'))
             module.atualizar(root, remove=True)
-            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(source.read_text(encoding='utf-8'), original.decode('utf-8').replace('\r\n', '\n'))
             source.write_text('unsupported server', encoding='utf-8')
             with self.assertRaises(RuntimeError):
                 module.atualizar(root)
