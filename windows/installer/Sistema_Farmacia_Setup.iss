@@ -1,5 +1,5 @@
 #define MyAppName "Sistema Farmácia"
-#define MyAppVersion "1.4.2"
+#define MyAppVersion "1.4.3"
 #define MyAppPublisher "9º Batalhão de Saúde"
 
 [Setup]
@@ -11,7 +11,7 @@ DefaultDirName={localappdata}\Programs\SistemaFarmacia
 DefaultGroupName=Sistema Farmácia
 PrivilegesRequired=lowest
 OutputDir=Saida
-OutputBaseFilename=Sistema_Farmacia_Setup_1.4.2
+OutputBaseFilename=Sistema_Farmacia_Setup_1.4.3
 SetupIconFile=Arquivos_do_Programa\Gerente_Farmacia.ico
 UninstallDisplayIcon={app}\Gerente_Farmacia.ico
 Compression=lzma2/max
@@ -24,11 +24,11 @@ RestartApplications=no
 UsePreviousAppDir=yes
 DisableProgramGroupPage=yes
 AllowNoIcons=no
-VersionInfoVersion=1.4.2.0
+VersionInfoVersion=1.4.3.0
 VersionInfoCompany=9º Batalhão de Saúde
 VersionInfoDescription=Gerente Farmácia e Cliente Farmácia
 VersionInfoProductName=Sistema Farmácia
-VersionInfoProductVersion=1.4.2
+VersionInfoProductVersion=1.4.3
 VersionInfoCopyright=9º Batalhão de Saúde
 
 [Languages]

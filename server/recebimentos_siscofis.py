@@ -29,6 +29,7 @@ def instalar(app, conn_factory, lock, agora, exigir_login, categorias):
         CREATE TABLE IF NOT EXISTS recebimentos_siscofis (
           id INTEGER PRIMARY KEY AUTOINCREMENT, categoria TEXT NOT NULL,
           medicamento TEXT NOT NULL, ficha TEXT NOT NULL, validade TEXT,
+          localizador TEXT NOT NULL DEFAULT '',
           comprimidos_cartela INTEGER, quantidade_recebida REAL NOT NULL,
           saldo_pendente REAL NOT NULL CHECK(saldo_pendente>=0),
           quantidade_liberada REAL NOT NULL DEFAULT 0,
@@ -80,7 +81,10 @@ def instalar(app, conn_factory, lock, agora, exigir_login, categorias):
             cartela = int(n)
         else:
             cartela = None
-        return cat, med, ficha, val, cartela
+        localizador = str(d.get('localizador') or '').strip()
+        if len(localizador) > 120:
+            raise ValueError('Localizador muito longo.')
+        return cat, med, ficha, val, cartela, localizador
 
     def audit(c, user, action, entity_id, detail):
         c.execute('INSERT INTO auditoria(data,usuario,acao,entidade,entidade_id,detalhes) VALUES(?,?,?,?,?,?)',
@@ -135,15 +139,15 @@ def instalar(app, conn_factory, lock, agora, exigir_login, categorias):
                 c.close()
         def criar():
             d = dados()
-            cat, med, ficha, val, cartela = produto(d)
+            cat, med, ficha, val, cartela, localizador = produto(d)
             qty = numero(d.get('estoque_inicial'), 'Quantidade recebida', True)
             def execute(c):
                 now = agora()
                 cur = c.execute('''INSERT INTO recebimentos_siscofis
-                    (categoria,medicamento,ficha,validade,comprimidos_cartela,quantidade_recebida,
+                    (categoria,medicamento,ficha,validade,comprimidos_cartela,localizador,quantidade_recebida,
                     saldo_pendente,observacao,criado_em,criado_por,atualizado_em)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
-                    (cat, med, ficha, val, cartela, qty, qty, str(d.get('observacao') or ''), now, user['usuario'], now))
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    (cat, med, ficha, val, cartela, localizador, qty, qty, str(d.get('observacao') or ''), now, user['usuario'], now))
                 audit(c, user, 'CADASTRO_AGUARDANDO_SISCOFIS', cur.lastrowid, d)
                 return {'ok': True, 'id': cur.lastrowid}
             return transacao('criar', d, user, execute)
@@ -166,11 +170,11 @@ def instalar(app, conn_factory, lock, agora, exigir_login, categorias):
                     c.execute("UPDATE recebimentos_siscofis SET estado='CANCELADO',versao=versao+1,atualizado_em=? WHERE id=?", (agora(), rid))
                     audit(c, user, 'CANCELAR_RECEBIMENTO_SISCOFIS', rid, {'antes': dict(old), 'motivo': d['motivo']})
                 else:
-                    cat, med, ficha, val, cartela = produto(d)
+                    cat, med, ficha, val, cartela, localizador = produto(d)
                     qty = numero(d.get('saldo_pendente'), 'Saldo pendente', True)
                     c.execute('''UPDATE recebimentos_siscofis SET categoria=?,medicamento=?,ficha=?,validade=?,
-                        comprimidos_cartela=?,saldo_pendente=?,observacao=?,versao=versao+1,atualizado_em=? WHERE id=?''',
-                        (cat, med, ficha, val, cartela, qty, str(d.get('observacao') or ''), agora(), rid))
+                        comprimidos_cartela=?,localizador=?,saldo_pendente=?,observacao=?,versao=versao+1,atualizado_em=? WHERE id=?''',
+                        (cat, med, ficha, val, cartela, localizador, qty, str(d.get('observacao') or ''), agora(), rid))
                     audit(c, user, 'EDITAR_RECEBIMENTO_SISCOFIS', rid, {'antes': dict(old), 'depois': d})
                 return {'ok': True}
             return transacao(request.method + '/' + str(rid), d, user, execute)
@@ -200,8 +204,10 @@ def instalar(app, conn_factory, lock, agora, exigir_login, categorias):
                     if qty > row['saldo_pendente']:
                         raise Conflito('Quantidade maior que o saldo aguardando conferência. Nenhum item foi liberado.')
                     target = c.execute('''SELECT * FROM lotes WHERE ativo=1 AND categoria=? AND medicamento=?
-                        AND ficha=? AND COALESCE(validade,'')=? AND COALESCE(comprimidos_cartela,0)=? ORDER BY id LIMIT 1''',
-                        (row['categoria'], row['medicamento'], row['ficha'], row['validade'] or '', row['comprimidos_cartela'] or 0)).fetchone()
+                        AND ficha=? AND COALESCE(validade,'')=? AND COALESCE(comprimidos_cartela,0)=?
+                        AND COALESCE(localizador,'')=? ORDER BY id LIMIT 1''',
+                        (row['categoria'], row['medicamento'], row['ficha'], row['validade'] or '',
+                         row['comprimidos_cartela'] or 0, row['localizador'])).fetchone()
                     now = agora()
                     before = target['estoque_atual'] if target else 0
                     if target:
@@ -209,8 +215,9 @@ def instalar(app, conn_factory, lock, agora, exigir_login, categorias):
                         c.execute('UPDATE lotes SET estoque_inicial=estoque_inicial+?,estoque_atual=estoque_atual+?,atualizado_em=? WHERE id=?', (qty, qty, now, lid))
                     else:
                         cur = c.execute('''INSERT INTO lotes(categoria,medicamento,ficha,validade,comprimidos_cartela,
-                            estoque_inicial,estoque_atual,criado_em,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?)''',
-                            (row['categoria'], row['medicamento'], row['ficha'], row['validade'], row['comprimidos_cartela'], qty, qty, now, now))
+                            localizador,estoque_inicial,estoque_atual,criado_em,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?)''',
+                            (row['categoria'], row['medicamento'], row['ficha'], row['validade'], row['comprimidos_cartela'],
+                             row['localizador'], qty, qty, now, now))
                         lid = cur.lastrowid
                     remaining = row['saldo_pendente'] - qty
                     c.execute('''UPDATE recebimentos_siscofis SET saldo_pendente=?,quantidade_liberada=quantidade_liberada+?,
@@ -224,7 +231,8 @@ def instalar(app, conn_factory, lock, agora, exigir_login, categorias):
                         (now, lid, row['categoria'], row['medicamento'], row['ficha'], user['usuario'], qty,
                          before, before + qty, 'ENTRADA_SISCOFIS', 'Recebimento #' + str(row['id']) + ' · ' + reference))
                     audit(c, user, 'LIBERAR_SISCOFIS_PARA_ESTOQUE', row['id'],
-                          {'lote_id': lid, 'quantidade': qty, 'saldo_pendente': remaining, 'referencia': reference})
+                          {'lote_id': lid, 'quantidade': qty, 'saldo_pendente': remaining,
+                           'localizador': row['localizador'], 'referencia': reference})
                     released.append({'recebimento_id': row['id'], 'lote_id': lid, 'quantidade': qty, 'saldo_pendente': remaining})
                 return {'ok': True, 'liberados': released}
             return transacao('liberar', d, user, execute)

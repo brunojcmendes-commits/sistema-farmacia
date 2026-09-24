@@ -45,7 +45,7 @@ class BridgeTests(unittest.TestCase):
         self.assertFalse(self.b.user['trocar_senha'])
     def test_client_cannot_access_management_even_if_remote_allows(self):
         self.b.mode='cliente'
-        for method,path in [('GET','/pedidos'),('GET','/historico'),('POST','/itens'),('GET','/auditoria'),('GET','/recebimentos'),('POST','/recebimentos/liberar'),('PUT','/recebimentos/1')]:
+        for method,path in [('GET','/pedidos'),('GET','/historico'),('POST','/itens'),('GET','/auditoria'),('GET','/recebimentos'),('POST','/recebimentos/liberar'),('PUT','/recebimentos/1'),('GET','/localizadores'),('POST','/itens-localizados'),('GET','/pedidos/1/localizadores')]:
             self.assertEqual(self.b.dispatch(method,path,{})[0],403)
         self.assertFalse(self.calls)
         self.assertEqual(self.b.dispatch('POST','/retiradas',{'itens':[]})[0],200)

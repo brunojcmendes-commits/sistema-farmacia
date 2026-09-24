@@ -19,16 +19,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Gerar atualizacao offline do servidor
-        run: python3 server/build_deb.py dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.2_all.deb
+        run: python3 server/build_deb.py dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb
       - name: Validar scripts do pacote
         run: |
-          dpkg-deb --info dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.2_all.deb
-          dpkg-deb --control dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.2_all.deb /tmp/siscofis-control
+          dpkg-deb --info dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb
+          dpkg-deb --control dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb /tmp/siscofis-control
           sh -n /tmp/siscofis-control/preinst /tmp/siscofis-control/postinst /tmp/siscofis-control/prerm
       - uses: actions/upload-artifact@v4
         with:
-          name: Servidor-Farmacia-SISCOFIS-1.4.2
-          path: dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.2_all.deb
+          name: Servidor-Farmacia-SISCOFIS-1.4.3
+          path: dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb
           if-no-files-found: error
           retention-days: 30
   compilar:
@@ -103,7 +103,7 @@ jobs:
       - name: Publicar instalador para download
         uses: actions/upload-artifact@v4
         with:
-          name: Sistema-Farmacia-Windows-1.4.2
-          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.2.exe
+          name: Sistema-Farmacia-Windows-1.4.3
+          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.3.exe
           if-no-files-found: error
           retention-days: 30

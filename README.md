@@ -1,14 +1,16 @@
-# SISTFARMA · Dashboard 1.4.2
+# SISTFARMA · Dashboard 1.4.3
 
 Continuação do Gestor e do Cliente Farmácia, com interface local em verde oliva e branco. O executável abre a interface no navegador e usa o servidor já existente. Os recursos visuais são incluídos no instalador e não dependem de internet/CDN.
 
 ## Uso
 
-Instale `Sistema_Farmacia_Setup_1.4.2.exe` e escolha Gerente, Cliente ou ambos. O instalador mantém a identidade do programa anterior, sem incluir ou substituir o banco do servidor. O endereço padrão é `http://10.56.121.242:5000`; um endereço já salvo em `config_cliente.json` é preservado e pode ser alterado em **Configurações**.
+Instale `Sistema_Farmacia_Setup_1.4.3.exe` e escolha Gerente, Cliente ou ambos. O instalador mantém a identidade do programa anterior, sem incluir ou substituir o banco do servidor. O endereço padrão é `http://10.56.121.242:5000`; um endereço já salvo em `config_cliente.json` é preservado e pode ser alterado em **Configurações**.
 
 O Gestor exige as contas existentes. Auditoria e Usuários são exclusivos do Gerente, também na ponte local. O Cliente mantém a solicitação por P/G, Nome de Guerra e OM. A versão clássica continua acessível em Configurações e com `--classico`.
 
 ## Aguardando conferência / SISCOFIS
+
+O campo **Localizador** registra onde está o produto (por exemplo, sala e prateleira). Ele pode ser pesquisado e editado no estoque disponível e em **Aguardando conferência / SISCOFIS**. Na liberação parcial, cada quantidade conserva o localizador informado naquele momento. No pedido do Gestor, **Ver pedido** mostra o localizador e a quantidade de cada lote que atendeu a solicitação, inclusive quando a saída veio de locais diferentes. O comprovante do Cliente continua sem expor o endereço interno do estoque. Lotes antigos sem localizador podem ser preenchidos pela edição.
 
 No cadastro do lote, marque **Colocar produto em conferência / SISCOFIS**. O recebimento é armazenado em tabela separada no servidor: não entra no catálogo do Cliente, no estoque disponível, nas validades do estoque nem na conferência física semanal. Clientes clássicos também não conseguem consumir esse saldo.
 
@@ -18,9 +20,9 @@ Gerente e Administrador podem cadastrar, editar e liberar. A Auditoria completa 
 
 ### Atualização do servidor — necessária para o novo recurso
 
-1. No computador Ubuntu/Mint que executa o **Servidor Farmácia**, instale `Servidor_Farmacia_Conferencia_SISCOFIS_1.4.2_all.deb` (`sudo dpkg -i Servidor_Farmacia_Conferencia_SISCOFIS_1.4.2_all.deb`). O servidor existente deve estar em `/opt/farmacia-servidor` e conter o módulo `recursos_estoque_130`.
+1. No computador Ubuntu/Mint que executa o **Servidor Farmácia**, instale `Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb` (`sudo dpkg -i Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb`). O servidor existente deve estar em `/opt/farmacia-servidor` e conter o módulo `recursos_estoque_130`.
 2. O pacote faz backup consistente do SQLite e do código alterado em `/var/backups/sistfarma-siscofis/`, adiciona o módulo e reinicia o serviço `farmacia-servidor`. Não inclui banco vazio, não troca usuários e não precisa baixar dependências em Ubuntu 22.04/Mint compatível com Python 3.8+.
-3. Nos computadores Windows, instale `Sistema_Farmacia_Setup_1.4.2.exe`. O endereço configurado continua preservado. Em servidor sem a extensão, o novo cadastro marcado é recusado com orientação de atualização; nunca cai silenciosamente no estoque disponível.
+3. Nos computadores Windows, instale `Sistema_Farmacia_Setup_1.4.3.exe`. O endereço configurado continua preservado. Em servidor sem a extensão, o novo cadastro marcado é recusado com orientação de atualização; nunca cai silenciosamente no estoque disponível.
 
 Este pacote DEB é uma extensão do **servidor**, não um instalador novo do Gestor/Cliente Linux. Um servidor com instalação/código diferente é recusado para preservar suas alterações. O módulo pode ser removido pelo gerenciador de pacotes: o estoque já liberado permanece e os registros pendentes continuam guardados no banco, indisponíveis para uso.
 
@@ -39,7 +41,7 @@ Falha de consulta aparece como indisponibilidade, nunca como saldo zero. Uma res
 
 ## Compatibilidade e limites
 
-A interface mantém os contratos do servidor SQLite 1.3.0. A extensão SISCOFIS adiciona somente tabelas próprias de recebimentos, liberações e controle de repetição; as tabelas existentes são preservadas. A consulta de conferência semanal usa a seleção já realizada pelo servidor. O histórico antigo pode não incluir entradas por cadastro de lote; o gráfico mostra apenas os movimentos retornados e calcula o sentido por saldo anterior/final. Os comprovantes do Cliente HTML ficam disponíveis na sessão; a versão clássica mantém suas rotinas anteriores de arquivos.
+A interface mantém os contratos do servidor SQLite 1.3.0. A extensão SISCOFIS adiciona tabelas de recebimentos, liberações e controle de repetição, além de uma coluna `localizador` aos lotes e recebimentos existentes. Os registros e saldos existentes são preservados. A consulta de conferência semanal usa a seleção já realizada pelo servidor. O histórico antigo pode não incluir entradas por cadastro de lote; o gráfico mostra apenas os movimentos retornados e calcula o sentido por saldo anterior/final. Os comprovantes do Cliente HTML ficam disponíveis na sessão; a versão clássica mantém suas rotinas anteriores de arquivos.
 
 Os testes de integração foram executados em uma base temporária, com o código do servidor 1.3.0 e dados fictícios. Não foi realizado acesso ao servidor operacional `10.56.121.242:5000`. A distribuição automática deste ramo gera instalador Windows x64. Os fontes continuam compatíveis com Python 3.8+ em Ubuntu/Mint; o DEB desta entrega atualiza somente o servidor para o recurso SISCOFIS.
 

@@ -48,5 +48,5 @@ export function topRequested(orders,today=new Date(),length=30){
 }
 export function filterLots(lots,{query='',category='',filter='all'}={}){
  const q=norm(query),zero=new Set(aggregateLots(lots).filter(x=>x.estoque_total<=0).map(x=>x.key));
- return lots.filter(l=>{if(category&&l.categoria!==category)return false;if(q&&!norm([l.medicamento,l.ficha,l.categoria].join(' ')).includes(q))return false;if(filter==='zero')return zero.has(l.categoria+'\u0000'+l.medicamento);if(filter==='positive')return number(l.estoque_atual)>0;if(filter==='all')return true;const v=validity(l.validade);if(number(l.estoque_atual)<=0)return false;return filter==='due'?['critical','attention'].includes(v.key):v.key===filter});
+ return lots.filter(l=>{if(category&&l.categoria!==category)return false;if(q&&!norm([l.medicamento,l.ficha,l.categoria,l.localizador].join(' ')).includes(q))return false;if(filter==='zero')return zero.has(l.categoria+'\u0000'+l.medicamento);if(filter==='positive')return number(l.estoque_atual)>0;if(filter==='all')return true;const v=validity(l.validade);if(number(l.estoque_atual)<=0)return false;return filter==='due'?['critical','attention'].includes(v.key):v.key===filter});
 }
