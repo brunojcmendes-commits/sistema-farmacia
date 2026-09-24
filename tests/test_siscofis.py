@@ -238,7 +238,7 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), original)
             previous = "# BEGIN SISTFARMA SISCOFIS 1.4.2\nfrom recebimentos_siscofis import instalar as _instalar_siscofis\n_instalar_siscofis(app, _conn, _lock, _agora, _exigir_login, CATEGORIAS)\n# END SISTFARMA SISCOFIS 1.4.2\n"
             marker = "if __name__=='__main__':iniciar_servidor()"
-            source.write_text(original.decode().replace(marker, previous+marker), encoding='utf-8')
+            source.write_bytes(original.replace(marker.encode('utf-8'), (previous+marker).encode('utf-8')))
             module.atualizar(root)
             self.assertIn(module.START, source.read_text(encoding='utf-8'))
             self.assertNotIn('SISCOFIS 1.4.2', source.read_text(encoding='utf-8'))
