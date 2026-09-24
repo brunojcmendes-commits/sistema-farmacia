@@ -10,6 +10,7 @@ os.environ['FARMACIA_DATA_DIR'] = sys.argv[1]
 import servidor_estoque as s
 from recebimentos_siscofis import instalar
 from localizador_estoque import instalar as instalar_localizador
+from externos_estoque import instalar as instalar_externos
 
 salt, digest = s._hash_senha('TesteSiscofis!42')
 c = s._conn()
@@ -19,4 +20,5 @@ c.close()
 s.db.cadastrar_lote('Materiais', 'Estoque anterior preservado', 'ANTES', '01/01/2030', 17, None)
 instalar(s.app, s._conn, s._lock, s._agora, s._exigir_login, s.CATEGORIAS)
 instalar_localizador(s.app, s._conn, s._lock, s._agora, s._exigir_login, s.CATEGORIAS)
+instalar_externos(s.app, s._conn, s._lock, s._agora, s._exigir_login, s.db._audit)
 s.iniciar_servidor('127.0.0.1', int(sys.argv[2]))

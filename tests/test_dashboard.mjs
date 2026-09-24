@@ -1,7 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const source=await readFile(new URL('../windows/web/data.js',import.meta.url),'utf8');
-const {dateValue,daysLeft,validity,stockMetrics,movementsByDay,topRequested,filterLots}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {dateValue,daysLeft,validity,externalAlerts,stockMetrics,movementsByDay,topRequested,filterLots}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const today=new Date(2026,8,22,23,55);
 assert.equal(dateValue('31/02/2026'),null);
 assert.equal(dateValue('22/09/2026').getMonth(),8);
@@ -15,6 +15,7 @@ assert.equal(validity('21/09/2026',today).label,'Vencido');
 assert.equal(validity('',today).key,'unknown');
 const lots=[{id:1,categoria:'Orais',medicamento:'A',estoque_atual:0,validade:'01/01/2026'},{id:2,categoria:'Orais',medicamento:'A',estoque_atual:7,validade:'21/01/2027'},{id:3,categoria:'Orais',medicamento:'B',estoque_atual:0},{id:4,categoria:'Orais',medicamento:'C',estoque_atual:3,validade:'22/12/2026'},{id:5,categoria:'Material',medicamento:'D',estoque_atual:5,validade:null}];
 assert.deepEqual(stockMetrics(lots,today),{items:3,zero:1,stockedLots:3,bins:{critical:0,attention:1,regular:1,unknown:1}});
+assert.deepEqual(externalAlerts([{estoque_atual:2,validade:'21/12/2026'},{estoque_atual:10,validade:'22/12/2026'},{estoque_atual:0,validade:'21/09/2026'}],today),{critical:1,attention:1,low:2});
 assert.deepEqual(filterLots(lots,{filter:'zero'}).map(x=>x.id),[3]);
 const moves=[{data:'22/09/2026 12:30',estoque_anterior:100,estoque_final:90,retirada:10},{data:'22/09/2026 14:00',estoque_anterior:90,estoque_final:95,retirada:5},{data:'22/08/2026 14:00',estoque_anterior:90,estoque_final:0}];
 const series=movementsByDay(moves,today);assert.equal(series.at(-1).entrada,5);assert.equal(series.at(-1).saida,10);assert.equal(series.reduce((a,x)=>a+x.saida,0),10);

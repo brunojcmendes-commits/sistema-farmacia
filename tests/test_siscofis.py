@@ -76,6 +76,28 @@ class SiscofisTests(unittest.TestCase):
         self.assertEqual(code, 200)
         return sum(l['estoque_atual'] for l in result['lotes'] if l['medicamento'] == name)
 
+    def test_external_lot_edit_observation_and_exact_delete(self):
+        name = 'Externo-' + uuid.uuid4().hex
+        for _ in range(2):
+            code, result = self.call('/apoio', 'POST', {'material': name, 'lote': 'MESMO',
+                'validade': '01/01/2030', 'estoque_inicial': 12, 'observacao': 'Entrada'})
+            self.assertEqual(code, 200, result)
+        code, details = self.call('/apoio/detalhes')
+        self.assertEqual(code, 200)
+        items = [x for x in details['itens'] if x['material'] == name]
+        self.assertEqual(len(items), 2)
+        self.assertNotEqual(items[0]['id'], items[1]['id'])
+        changed = {'material': name, 'lote': 'MESMO', 'validade': '30/12/2026',
+            'estoque_inicial': 12, 'estoque_atual': 4, 'observacao': 'Atenção: conferir caixa'}
+        self.assertEqual(self.call('/apoio/' + str(items[0]['id']), 'PUT', changed)[0], 200)
+        self.assertEqual(self.call('/apoio/' + str(items[1]['id']), 'PUT', {**changed, 'estoque_atual': -1})[0], 400)
+        rows = [x for x in self.call('/apoio/detalhes')[1]['itens'] if x['material'] == name]
+        self.assertEqual(next(x for x in rows if x['id'] == items[0]['id'])['observacao'], changed['observacao'])
+        self.assertEqual(next(x for x in rows if x['id'] == items[1]['id'])['estoque_atual'], 12)
+        self.assertEqual(self.call('/apoio/' + str(items[0]['id']), 'DELETE', {})[0], 200)
+        self.assertEqual([x['id'] for x in self.call('/apoio/detalhes')[1]['itens'] if x['material'] == name], [items[1]['id']])
+        self.assertEqual(self.call('/apoio/detalhes', auth=False)[0], 401)
+
     def test_blocked_in_catalog_withdrawals_and_existing_data_preserved(self):
         item, name, _ = self.create()
         self.assertEqual(self.stock(name), 0)

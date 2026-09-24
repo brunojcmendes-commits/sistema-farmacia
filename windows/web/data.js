@@ -22,6 +22,15 @@ export function validity(value,today=new Date()){
  if(days<=120)return {key:'attention',label:'91 a 120 dias',tone:'warning',days};
  return {key:'regular',label:'Acima de 120 dias',tone:'success',days};
 }
+export function externalAlerts(lots,today=new Date(),lowLimit=5){
+ const result={critical:0,attention:0,low:0};
+ for(const lot of lots){
+  const stock=number(lot.estoque_atual);
+  if(stock<=lowLimit)result.low++;
+  if(stock>0){const status=validity(lot.validade,today).key;if(status==='critical'||status==='attention')result[status]++}
+ }
+ return result;
+}
 export function aggregateLots(lots){
  const map=new Map();
  for(const lot of lots){const key=lot.categoria+'\u0000'+lot.medicamento;let item=map.get(key);if(!item){item={key,categoria:lot.categoria,medicamento:lot.medicamento,estoque_total:0,lotes:[],comprimidos_por_cartela:[]};map.set(key,item)}item.estoque_total+=number(lot.estoque_atual);item.lotes.push(lot);if(lot.comprimidos_cartela&&!item.comprimidos_por_cartela.includes(lot.comprimidos_cartela))item.comprimidos_por_cartela.push(lot.comprimidos_cartela);}

@@ -1,10 +1,10 @@
-# SISTFARMA · Dashboard 1.4.3
+# SISTFARMA · Dashboard 1.4.4
 
 Continuação do Gestor e do Cliente Farmácia, com interface local em verde oliva e branco. O executável abre a interface no navegador e usa o servidor já existente. Os recursos visuais são incluídos no instalador e não dependem de internet/CDN.
 
 ## Uso
 
-Instale `Sistema_Farmacia_Setup_1.4.3.exe` e escolha Gerente, Cliente ou ambos. O instalador mantém a identidade do programa anterior, sem incluir ou substituir o banco do servidor. O endereço padrão é `http://10.56.121.242:5000`; um endereço já salvo em `config_cliente.json` é preservado e pode ser alterado em **Configurações**.
+Instale `Sistema_Farmacia_Setup_1.4.4.exe` e escolha Gerente, Cliente ou ambos. O instalador mantém a identidade do programa anterior, sem incluir ou substituir o banco do servidor. O endereço padrão é `http://10.56.121.242:5000`; um endereço já salvo em `config_cliente.json` é preservado e pode ser alterado em **Configurações**.
 
 O Gestor exige as contas existentes. Auditoria e Usuários são exclusivos do Gerente, também na ponte local. O Cliente mantém a solicitação por P/G, Nome de Guerra e OM. A versão clássica continua acessível em Configurações e com `--classico`.
 
@@ -18,11 +18,17 @@ Na nova aba, selecione um ou mais recebimentos e escolha **Liberar selecionados 
 
 Gerente e Administrador podem cadastrar, editar e liberar. A Auditoria completa continua exclusiva do Gerente. Alterações concorrentes exigem atualizar a lista; repetição da mesma operação não duplica o saldo.
 
+## Lotes externos
+
+Na aba **Externos**, o Gestor pode editar material, lote, validade, estoque inicial, saldo atual e observação. As observações aparecem diretamente na lista e participam da busca. Edição e exclusão usam o ID do registro, para não afetar outro lote com o mesmo nome e número.
+
+Validades seguem as faixas do estoque: até 90 dias (incluindo vencidos) e de 91 a 120 dias. Os alertas de validade contam somente lotes externos com saldo; **estoque baixo** indica 5 unidades ou menos, incluindo saldo zerado. A aba oferece filtros e contadores próprios, e o Painel mostra um resumo clicável desses alertas. Lotes externos permanecem separados do estoque disponível para pedidos.
+
 ### Atualização do servidor — necessária para o novo recurso
 
-1. No computador Ubuntu/Mint que executa o **Servidor Farmácia**, instale `Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb` (`sudo dpkg -i Servidor_Farmacia_Conferencia_SISCOFIS_1.4.3_all.deb`). O servidor existente deve estar em `/opt/farmacia-servidor` e conter o módulo `recursos_estoque_130`.
+1. No computador Ubuntu/Mint que executa o **Servidor Farmácia**, instale `Servidor_Farmacia_Conferencia_SISCOFIS_1.4.4_all.deb` (`sudo dpkg -i Servidor_Farmacia_Conferencia_SISCOFIS_1.4.4_all.deb`). O servidor existente deve estar em `/opt/farmacia-servidor` e conter o módulo `recursos_estoque_130`.
 2. O pacote faz backup consistente do SQLite e do código alterado em `/var/backups/sistfarma-siscofis/`, adiciona o módulo e reinicia o serviço `farmacia-servidor`. Não inclui banco vazio, não troca usuários e não precisa baixar dependências em Ubuntu 22.04/Mint compatível com Python 3.8+.
-3. Nos computadores Windows, instale `Sistema_Farmacia_Setup_1.4.3.exe`. O endereço configurado continua preservado. Em servidor sem a extensão, o novo cadastro marcado é recusado com orientação de atualização; nunca cai silenciosamente no estoque disponível.
+3. Nos computadores Windows, instale `Sistema_Farmacia_Setup_1.4.4.exe`. O endereço configurado continua preservado. Em servidor sem a extensão, o novo cadastro marcado é recusado com orientação de atualização; nunca cai silenciosamente no estoque disponível.
 
 Este pacote DEB é uma extensão do **servidor**, não um instalador novo do Gestor/Cliente Linux. Um servidor com instalação/código diferente é recusado para preservar suas alterações. O módulo pode ser removido pelo gerenciador de pacotes: o estoque já liberado permanece e os registros pendentes continuam guardados no banco, indisponíveis para uso.
 
