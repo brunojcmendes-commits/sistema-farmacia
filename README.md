@@ -10,6 +10,8 @@ Instale `Sistema_Farmacia_Setup_1.4.4.exe` e escolha Gerente, Cliente ou ambos. 
 
 `linux/build_clientes.py` gera quatro instaladores `.deb`: Ubuntu 22.04 e Mint 20.3, nas opções Online e Offline. Os dois usam a interface HTML atual do Cliente e guardam as configurações pessoais em `~/.local/share/farmacia-cliente`. A opção Online depende do Python 3 da distribuição. A opção Offline inclui um runtime Python 3.12 compatível com glibc 2.17 e biblioteca padrão, sem depender do Python instalado; necessita de navegador gráfico no desktop. Para gerar os pacotes offline, indique `SISTFARMA_PORTABLE_PYTHON` apontando para esse executável portátil. Instale Online com `sudo apt install ./arquivo.deb` e Offline com `sudo dpkg -i ./arquivo.deb`.
 
+`linux/build_gerente.py` gera também o **Gestor Farmácia Ubuntu 22.04** Online e Offline, com a mesma interface, perfil de login e empacotamento independente do Cliente. A versão Offline embute o Python portátil; as duas opções preservam o endereço configurado pelo usuário.
+
 O servidor Ubuntu tem duas rotas: `server/build_full_deb.py` cria instalação completa para um computador novo; `server/build_deb.py` cria a atualização da instalação 1.3.0/1.4.x existente. São alternativas. O pacote completo não contém banco SQLite e a atualização faz backup antes de modificar o código do servidor existente. O Cliente precisa da rede local/VPN para alcançar o servidor em ambos os modos.
 
 O Gestor exige as contas existentes. Auditoria e Usuários são exclusivos do Gerente, também na ponte local. O Cliente mantém a solicitação por P/G, Nome de Guerra e OM. A versão clássica continua acessível em Configurações e com `--classico`.
