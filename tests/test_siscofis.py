@@ -1,4 +1,5 @@
 import concurrent.futures
+from contextlib import closing
 import importlib.util
 import json
 import os
@@ -157,12 +158,13 @@ class InstallerTests(unittest.TestCase):
             original = source.read_bytes()
             database = root/'var/lib/farmacia-servidor/farmacia.db'
             database.parent.mkdir(parents=True)
-            with sqlite3.connect(database) as c:
+            with closing(sqlite3.connect(database)) as c:
                 c.execute('CREATE TABLE estoque(valor INTEGER)')
                 c.execute('INSERT INTO estoque VALUES(17)')
+                c.commit()
             backup = module.atualizar(root)
             self.assertEqual((backup/source.name).read_bytes(), original)
-            with sqlite3.connect(backup/'farmacia-servico.db') as c:
+            with closing(sqlite3.connect(backup/'farmacia-servico.db')) as c:
                 self.assertEqual(c.execute('SELECT valor FROM estoque').fetchone()[0], 17)
             self.assertIsNone(module.atualizar(root))
             module.atualizar(root, remove=True)
