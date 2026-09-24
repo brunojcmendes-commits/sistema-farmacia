@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "sistfarma-1.4.0-dashboard"
     tags:
       - "v*"
 
@@ -12,6 +13,24 @@ permissions:
   contents: read
 
 jobs:
+  servidor:
+    name: Empacotar extensao SISCOFIS Ubuntu
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gerar atualizacao offline do servidor
+        run: python3 server/build_deb.py dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.4_all.deb
+      - name: Validar scripts do pacote
+        run: |
+          dpkg-deb --info dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.4_all.deb
+          dpkg-deb --control dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.4_all.deb /tmp/siscofis-control
+          sh -n /tmp/siscofis-control/preinst /tmp/siscofis-control/postinst /tmp/siscofis-control/prerm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Servidor-Farmacia-SISCOFIS-1.4.4
+          path: dist/Servidor_Farmacia_Conferencia_SISCOFIS_1.4.4_all.deb
+          if-no-files-found: error
+          retention-days: 30
   compilar:
     name: Compilar Sistema Farmacia
     runs-on: windows-2022
@@ -27,6 +46,14 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-build.txt
 
+      - name: Testar calculos e ponte local
+        shell: powershell
+        run: |
+          python -m unittest discover -s tests -p "test_*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw "Falha nos testes Python." }
+          node tests/test_dashboard.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Falha nos testes do painel." }
+
       - name: Instalar o compilador dos aplicativos
         shell: powershell
         run: python -m pip install "pyinstaller>=6,<7"
@@ -39,12 +66,14 @@ jobs:
             --name "Gerente_Farmacia" `
             --icon "Gerente_Farmacia.ico" `
             --add-data "Gerente_Farmacia.png;." `
-            gerente_farmacia.py
+            --add-data "../web;web" `
+            gestor_html.py
           pyinstaller --noconfirm --clean --windowed --onefile `
             --name "Cliente_Farmacia" `
             --icon "Cliente_Farmacia.ico" `
             --add-data "Cliente_Farmacia.png;." `
-            cliente_farmacia.py
+            --add-data "../web;web" `
+            cliente_html.py
           Pop-Location
 
       - name: Preparar arquivos do instalador
@@ -55,6 +84,10 @@ jobs:
           Copy-Item "windows/src/dist/Cliente_Farmacia.exe" "windows/installer/Arquivos_do_Programa/"
           Copy-Item "windows/src/Gerente_Farmacia.ico" "windows/installer/Arquivos_do_Programa/"
           Copy-Item "windows/src/Cliente_Farmacia.ico" "windows/installer/Arquivos_do_Programa/"
+
+      - name: Testar executaveis empacotados
+        shell: powershell
+        run: python tests/smoke_frozen.py windows/installer/Arquivos_do_Programa
 
       - name: Instalar Inno Setup
         shell: powershell
@@ -70,7 +103,7 @@ jobs:
       - name: Publicar instalador para download
         uses: actions/upload-artifact@v4
         with:
-          name: Sistema-Farmacia-Windows-1.3.2
-          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.3.2.exe
+          name: Sistema-Farmacia-Windows-1.4.4
+          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.4.exe
           if-no-files-found: error
           retention-days: 30

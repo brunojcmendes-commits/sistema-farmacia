@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SISTFARMA · Gestão de Farmácia</title>
+<link rel="icon" type="image/svg+xml" href="brand.svg"><link rel="stylesheet" href="app.css">
+<script src="bootstrap.js"></script><script type="module" src="app.js"></script>
+</head>
+<body>
+<aside class="sidebar" id="sidebar"><div class="brand"><img src="brand.svg" alt="" width="46" height="46"><div><strong>SISTFARMA</strong><span id="appName">Gestor Farmácia</span></div></div><nav id="menu" aria-label="Menu principal"></nav><div class="sidebar-bottom"><div class="mission">SAÚDE<br>PRONTA<br>SEMPRE</div><span id="version"></span></div></aside>
+<div class="workspace"><header class="topbar"><button class="icon-button" id="menuToggle" aria-label="Abrir ou fechar menu" aria-expanded="true"></button><label class="global-search"><span id="searchIcon"></span><input id="globalSearch" type="search" placeholder="Pesquisar medicamento, material ou lote…" aria-label="Pesquisa geral"></label><button class="icon-button" id="refreshTop" title="Atualizar dados" aria-label="Atualizar dados"></button><button class="icon-button notifications" id="notifications" aria-label="Ver pedidos pendentes" data-nav="orders" hidden></button><div class="profile"><div class="avatar" id="avatar">SF</div><div><strong id="profileName">Acesso à farmácia</strong><small id="profileRole">Rede local</small></div></div><button class="text-button" id="logout" hidden>Sair</button></header>
+<main id="main"><div class="page-heading"><div><div class="eyebrow" id="eyebrow">CONTROLE E DISPONIBILIDADE</div><h1 id="areaTitle">Visão geral</h1><p id="subtitle">Acompanhe a situação atual da farmácia.</p></div><div class="connection"><div><span id="connectionDot" class="dot neutral"></span><strong id="connectionText">Verificando conexão</strong><small id="serverAddress"></small></div><div class="clock"><strong id="clock"></strong><small id="today"></small></div></div></div><div id="notices" aria-live="polite"></div><section id="content" aria-live="polite"><div class="empty">Carregando o sistema…</div></section></main>
+<footer><span>Exército Brasileiro — Saúde em Apoio à Missão</span><span id="lastUpdate">Aguardando atualização</span></footer></div>
+<dialog id="dialog"><div class="dialog-heading"><h2 id="dialogTitle"></h2><button class="icon-button" id="closeDialog" aria-label="Fechar janela">×</button></div><div id="dialogContent"></div></dialog><div id="toast" role="status" hidden></div><div id="printArea"></div>
+</body></html>
