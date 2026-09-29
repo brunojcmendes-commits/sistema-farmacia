@@ -10,3 +10,9 @@
 
 /* Composição visual incorporada da revisão aprovada de 22/09. */
 .sidebar{background:linear-gradient(180deg,#174b28,#0b321b 72%,#153c22);padding-top:22px}.brand{flex-direction:column;text-align:center;gap:7px;padding:0 8px 21px}.brand img{width:60px;height:60px}.brand strong{font-size:24px}.brand span{font-size:14px}.sidebar-bottom .mission{font-size:18px;line-height:1.35;font-weight:700;text-align:left;margin-left:47px;border:0;padding:0;color:#becb71}.sidebar-bottom .mission:after{content:"";display:block;width:54px;height:3px;background:#becb71;margin-top:15px}.sidebar-bottom>span{text-align:center}.notifications{position:relative}.notification-count{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;line-height:16px;border-radius:9px;background:#d4544f;color:#fff;font-size:9px}.conference-strip{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 5px 0;font-size:11px;color:#5c715e}.conference-strip>span{display:flex;align-items:center;gap:6px}.conference-strip svg{width:18px;height:18px}.conference-strip b{font-weight:600}@media(max-width:600px){.conference-strip{align-items:flex-start}.conference-strip>span{display:block;line-height:1.7}.conference-strip svg{display:none}}
+.fs-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.fs-tabs .button:not(.secondary){color:#fff;background:#31543a}
+.fs-tabs .button.secondary{color:#31543a;background:#e6eee5}
+.fs-metrics{margin-bottom:18px}
+.fs-metrics .metric{min-height:92px;padding:18px;text-align:left}
+.fs-metrics .metric strong{display:block;font-size:26px;margin-top:6px}

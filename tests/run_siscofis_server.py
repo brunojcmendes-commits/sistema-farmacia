@@ -11,6 +11,8 @@ import servidor_estoque as s
 from recebimentos_siscofis import instalar
 from localizador_estoque import instalar as instalar_localizador
 from externos_estoque import instalar as instalar_externos
+from aquisicoes_fs import instalar as instalar_aquisicoes
+from usuarios_gestao import instalar as instalar_usuarios_gestao
 
 salt, digest = s._hash_senha('TesteSiscofis!42')
 c = s._conn()
@@ -21,4 +23,6 @@ s.db.cadastrar_lote('Materiais', 'Estoque anterior preservado', 'ANTES', '01/01/
 instalar(s.app, s._conn, s._lock, s._agora, s._exigir_login, s.CATEGORIAS)
 instalar_localizador(s.app, s._conn, s._lock, s._agora, s._exigir_login, s.CATEGORIAS)
 instalar_externos(s.app, s._conn, s._lock, s._agora, s._exigir_login, s.db._audit)
+instalar_aquisicoes(s.app, s._conn, s._lock, s._agora, s._exigir_login, s.db._audit)
+instalar_usuarios_gestao(s.app, s._conn, s._exigir_gerente, s._hash_senha, s._sessoes, s.db._audit)
 s.iniciar_servidor('127.0.0.1', int(sys.argv[2]))

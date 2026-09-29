@@ -43,6 +43,17 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(self.b.dispatch('POST','/itens',{})[0],403)
         self.assertEqual(self.b.dispatch('POST','/minha-senha',{'nova_senha':'nova-senha'})[0],200)
         self.assertFalse(self.b.user['trocar_senha'])
+    def test_acquisitions_and_user_management_routing(self):
+        self.b.user={'id':1,'perfil':'gerente','trocar_senha':False}
+        for method,path in [('GET','/aquisicoes-fs'),('GET','/empresas-fs'),
+                            ('GET','/paassex'),('POST','/paassex/autorizacoes'),
+                            ('PUT','/aquisicoes-fs/2'),('PUT','/empresas-fs/3'),
+                            ('POST','/usuarios/4/senha'),('DELETE','/usuarios/4')]:
+            self.assertEqual(self.b.dispatch(method,path,{} )[0],200,(method,path))
+        self.b.user={'id':2,'perfil':'administrador','trocar_senha':False}
+        self.assertEqual(self.b.dispatch('POST','/usuarios/4/senha',{})[0],403)
+        self.assertEqual(self.b.dispatch('DELETE','/usuarios/4')[0],403)
+        self.assertEqual(self.b.dispatch('GET','/aquisicoes-fs')[0],200)
     def test_client_cannot_access_management_even_if_remote_allows(self):
         self.b.mode='cliente'
         for method,path in [('GET','/pedidos'),('GET','/historico'),('POST','/itens'),('GET','/auditoria'),('GET','/recebimentos'),('POST','/recebimentos/liberar'),('PUT','/recebimentos/1'),('GET','/localizadores'),('POST','/itens-localizados'),('GET','/pedidos/1/localizadores')]:

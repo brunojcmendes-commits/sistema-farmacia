@@ -15,10 +15,10 @@ with tempfile.TemporaryDirectory() as directory:
     control.mkdir()
     target = root / 'opt/farmacia-servidor'
     target.mkdir(parents=True)
-    for name in ('recebimentos_siscofis.py', 'localizador_estoque.py', 'externos_estoque.py', 'instalar_extensao.py'):
+    for name in ('recebimentos_siscofis.py', 'localizador_estoque.py', 'externos_estoque.py', 'aquisicoes_fs.py', 'usuarios_gestao.py', 'instalar_extensao.py'):
         shutil.copy2(here / name, target / name)
     (control / 'control').write_text('''Package: farmacia-conferencia-siscofis
-Version: 1.4.4
+Version: 1.4.5
 Section: misc
 Priority: optional
 Architecture: all

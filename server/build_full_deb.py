@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory() as directory:
     target.mkdir(parents=True)
     for name in ('flask.py', 'recursos_estoque_130.py'):
         shutil.copy2(here / 'base' / name, target / name)
-    for name in ('recebimentos_siscofis.py', 'localizador_estoque.py', 'externos_estoque.py'):
+    for name in ('recebimentos_siscofis.py', 'localizador_estoque.py', 'externos_estoque.py', 'aquisicoes_fs.py', 'usuarios_gestao.py'):
         shutil.copy2(here / name, target / name)
     source = (here / 'base/servidor_estoque.py').read_text(encoding='utf-8')
     marker = "if __name__=='__main__':iniciar_servidor()"
@@ -49,7 +49,7 @@ Group=farmacia
 WantedBy=multi-user.target
 ''')
     (control / 'control').write_text('''Package: farmacia-servidor
-Version: 1.4.4
+Version: 1.4.5
 Section: misc
 Priority: optional
 Architecture: all
@@ -69,7 +69,7 @@ db=/var/lib/farmacia-servidor/farmacia.db
 if [ -f "$db" ]; then
   mkdir -p /var/backups/sistfarma-servidor
   STAMP=$(date +%Y%m%d-%H%M%S)
-  export SISTFARMA_BACKUP_DB="$db" SISTFARMA_BACKUP_OUT="/var/backups/sistfarma-servidor/antes_1.4.4_${STAMP}.db"
+  export SISTFARMA_BACKUP_DB="$db" SISTFARMA_BACKUP_OUT="/var/backups/sistfarma-servidor/antes_1.4.5_${STAMP}.db"
   python3 - <<'PYBACKUP'
 import os, sqlite3
 source = sqlite3.connect(os.environ['SISTFARMA_BACKUP_DB'])
