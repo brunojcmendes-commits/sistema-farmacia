@@ -6,6 +6,7 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
     permanente:'Permanente · 4.4.90.52'
   };
   const shortDate = value => value ? value.split('-').reverse().join('/') : '—';
+  const money = value => value ? Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
   const tabs = [['aquisicoes','Aquisições FS'],['empresas','Empresas'],['paassex','PAASSEx']];
   function button(label,action,id) {
     return `<button class="button secondary small" data-fs="${action}" data-id="${id}">${label}</button>`;
@@ -45,8 +46,8 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
       <button class="button" data-fs="new-acquisition">+ Nova aquisição</button>
       <button class="button secondary" data-fs="print-acquisitions">Imprimir relatório</button></div>
       ${panel('Acompanhamento',S.aquisicoesFS===null?errorView():
-        table(['Material / serviço','Tipo','Requisição','Empenho','Empresa','Prazo 30 dias','Rastreio','Entrega','Situação',''],
-          rows.map(x=>[`<b>${esc(x.material)}</b>`,esc(tipos[x.tipo]||'—'),
+        table(['Itens / material','Tipo','Requisição','Empenho','Empresa','Prazo 30 dias','Rastreio','Entrega','Situação',''],
+          rows.map(x=>[`<b>${esc(x.material)}</b><small>${x.itens?.length||1} item(ns)</small>`,esc(tipos[x.tipo]||'—'),
             esc(x.requisicao_numero||'—'),esc(x.empenho_numero||'—'),esc(x.empresa_nome||'—'),
             shortDate(x.prazo_30_dias),esc(x.rastreio||'—'),shortDate(x.entrega_data),
             acquisitionStatus(x),button('Editar','edit-acquisition',x.id)])))}`;
@@ -95,15 +96,43 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
       async data=>{const result=await api('/empresas-fs'+(id?'/'+id:''),id?'PUT':'POST',data);await load();toast('Empresa salva.');
         if(returnToAcquisition)setTimeout(()=>acquisitionForm(returnToAcquisition.id, {...returnToAcquisition.data,empresa_id:result.id}),0);});
   }
+  const itemKeys=['item','codigo_catmat_catserv','descricao','unidade','quantidade','nd_si','preco_unitario'];
+  function itemRow(item={}) {
+    return `<div class="fs-item" data-fs-item><div class="fs-item-head"><strong>Item <span data-item-index></span></strong>
+      <button type="button" class="button secondary small" data-fs="remove-item">Remover</button></div>
+      <div class="form-grid">${field('ITEM','item',item.item||'','text','maxlength="20"')}
+      ${field('CÓD CatMat/CatServ','codigo_catmat_catserv',item.codigo_catmat_catserv||'','text','maxlength="120"')}
+      ${field('Descrição do material / serviço','descricao',item.descricao||'','text','required maxlength="1000"')}
+      ${field('UND','unidade',item.unidade||'','text','maxlength="120"')}
+      ${field('QTD','quantidade',item.quantidade||'','number','min="0" step="any"')}
+      ${field('ND / S.I.','nd_si',item.nd_si||'','text','maxlength="120"')}
+      ${field('P. UNT','preco_unitario',item.preco_unitario||'','number','min="0" step="0.01"')}
+      <label class="field">P. TOTAL<input data-item-total readonly value="${esc(item.preco_total||'')}" aria-label="Preço total calculado"></label></div></div>`;
+  }
+  function collectItems() {
+    return [...document.querySelectorAll('#modalForm [data-fs-item]')].map(row=>
+      Object.fromEntries(itemKeys.map(key=>[key,row.querySelector(`[name="${key}"]`).value])));
+  }
+  function renumberItems() {
+    document.querySelectorAll('#modalForm [data-fs-item]').forEach((row,i)=>{
+      row.querySelector('[data-item-index]').textContent=i+1;
+      if(!row.querySelector('[name="item"]').value)row.querySelector('[name="item"]').placeholder=String(i+1);
+    });
+  }
   function acquisitionForm(id, draft) {
     const item=draft||(id?S.aquisicoesFS.find(x=>x.id===id):{});
     const options='<option value="">Selecione, se já definido</option>'+
       (S.empresasFS||[]).map(x=>`<option value="${x.id}" ${String(item.empresa_id)===String(x.id)?'selected':''}>${esc(x.nome)}</option>`).join('');
     const types='<option value="">A classificar</option>'+
       Object.entries(tipos).map(([key,label])=>`<option value="${key}" ${item.tipo===key?'selected':''}>${esc(label)}</option>`).join('');
+    const items=draft?.itens||item.itens||[{item:'1',descricao:item.material||''}];
     formDialog(id?'Editar aquisição':'Nova aquisição',
       `<p class="subtle">Você pode salvar com informações parciais. O alerta é calculado somente após informar a data do empenho.</p>
-      <div class="form-grid">${field('Material / serviço','material',item.material||'','text','required maxlength="240"')}
+      <div class="fs-items"><h3>Itens desta aquisição</h3><p class="subtle">Cadastre vários itens para a mesma empresa. O preço total é calculado pela quantidade e preço unitário.</p>
+      <div id="fsItemRows">${items.map(itemRow).join('')}</div>
+      <button type="button" class="button secondary" data-fs="add-item">+ Adicionar item</button></div>
+      <div class="form-grid"><input type="hidden" name="material" value="${esc(item.material||'')}">
+      <label class="field">Resumo do material / serviço<input value="${esc(item.material||items[0]?.descricao||'')}" disabled></label>
       <label class="field">Tipo e código<select name="tipo">${types}</select></label>
       ${field('Requisição nº','requisicao_numero',item.requisicao_numero||'')}
       ${field('Data da requisição','requisicao_data',item.requisicao_data||'','date')}
@@ -117,7 +146,9 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
       ${field('Liquidação / nota nº','liquidacao_numero',item.liquidacao_numero||'')}
       ${field('Data da liquidação','liquidacao_data',item.liquidacao_data||'','date')}
       <label class="field wide">Observações<textarea name="observacao" maxlength="1000">${esc(item.observacao||'')}</textarea></label></div>`,
-      async data=>{await api('/aquisicoes-fs'+(id?'/'+id:''),id?'PUT':'POST',data);await load();toast('Aquisição salva.');});
+      async data=>{data.itens=collectItems();data.material=data.itens[0]?.descricao||data.material;
+        await api('/aquisicoes-fs'+(id?'/'+id:''),id?'PUT':'POST',data);await load();toast('Aquisição salva.');});
+    renumberItems();
   }
   function paassexForm() {
     formDialog('Cadastrar item solicitado · PAASSEx',
@@ -132,8 +163,13 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
     if(fs==='tab'){S.fsTab=id;render();return true}
     if(fs==='new-company'){
       const acquisition=document.querySelector('#modalForm [name="material"]');
-      companyForm(undefined,acquisition?{id:S.fsEditingAcquisition,data:Object.fromEntries(new FormData(acquisition.form))}:null);
+      companyForm(undefined,acquisition?{id:S.fsEditingAcquisition,data:{...Object.fromEntries(new FormData(acquisition.form)),itens:collectItems()}}:null);
       return true;
+    }
+    if(fs==='add-item'){document.querySelector('#fsItemRows').insertAdjacentHTML('beforeend',itemRow());renumberItems();return true}
+    if(fs==='remove-item'){
+      if(document.querySelectorAll('#fsItemRows [data-fs-item]').length<=1)throw Error('Mantenha ao menos um item.');
+      button.closest('[data-fs-item]').remove();renumberItems();return true;
     }
     if(fs==='edit-company'){companyForm(Number(id));return true}
     if(fs==='new-acquisition'){S.fsEditingAcquisition=undefined;acquisitionForm();return true}
@@ -147,10 +183,13 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
     }
     if(fs.startsWith('print-')){
       const type=fs.slice(6);
-      if(type==='aquisicoes')printHtml('Aquisições FS',table(['Material','Tipo','Requisição','Empenho','Empresa','Prazo 30 dias','Rastreio','Entrega','Situação'],
-        (S.aquisicoesFS||[]).map(x=>[esc(x.material),esc(tipos[x.tipo]||'—'),esc(x.requisicao_numero||'—'),
-          esc(x.empenho_numero||'—'),esc(x.empresa_nome||'—'),shortDate(x.prazo_30_dias),
-          esc(x.rastreio||'—'),shortDate(x.entrega_data),acquisitionStatus(x)])));
+      if(type==='acquisitions')printHtml('Aquisições FS',(S.aquisicoesFS||[]).map(x=>
+        `<section class="fs-print-acquisition"><h2>Aquisição ${x.id} · ${esc(x.empresa_nome||'Empresa a definir')}</h2>
+        <p>Tipo: ${esc(tipos[x.tipo]||'—')} · Requisição: ${esc(x.requisicao_numero||'—')} · Empenho: ${esc(x.empenho_numero||'—')} · Data do empenho: ${shortDate(x.empenho_data)} · Prazo: ${shortDate(x.prazo_30_dias)}</p>
+        <p>Localizador / rastreio: ${esc(x.rastreio||'—')} · Entrega: ${shortDate(x.entrega_data)} · Situação: ${acquisitionStatus(x)}</p>
+        ${table(['ITEM','CÓD CatMat/CatServ','Descrição do material / serviço','UND','QTD','ND / S.I.','P. UNT','P. TOTAL'],
+          (x.itens||[]).map(i=>[esc(i.item),esc(i.codigo_catmat_catserv),esc(i.descricao),esc(i.unidade),esc(i.quantidade),esc(i.nd_si),money(i.preco_unitario),money(i.preco_total)]))}
+        <p>Liquidação: ${esc(x.liquidacao_numero||'—')} · Observações: ${esc(x.observacao||'—')}</p></section>`).join('')||'<p>Nenhuma aquisição cadastrada.</p>');
       if(type==='companies')printHtml('Empresas',table(['Nome','CNPJ','Telefone','E-mail'],
         (S.empresasFS||[]).map(x=>[esc(x.nome),esc(x.cnpj),esc(x.telefone),esc(x.email)])));
       if(type==='paassex')printHtml('PAASSEx',`<h2>Itens solicitados</h2>`+
@@ -163,6 +202,12 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
     return false;
   }
   function change(element) {
+    const row=element.closest('[data-fs-item]');
+    if(row&&['quantidade','preco_unitario'].includes(element.name)){
+      const qty=Number(row.querySelector('[name="quantidade"]').value),price=Number(row.querySelector('[name="preco_unitario"]').value);
+      row.querySelector('[data-item-total]').value=row.querySelector('[name="quantidade"]').value&&row.querySelector('[name="preco_unitario"]').value?(qty*price).toFixed(2):'';
+      return true;
+    }
     if(element.id==='fsYear'){S.fsYear=element.value;render();return true}
     if(element.matches('[data-paass-select]')){
       S.fsSelected=S.fsSelected||new Set();

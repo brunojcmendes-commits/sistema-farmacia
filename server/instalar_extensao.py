@@ -6,8 +6,8 @@ import os
 import shutil
 import sqlite3
 
-START = '# BEGIN SISTFARMA SISCOFIS 1.4.5'
-END = '# END SISTFARMA SISCOFIS 1.4.5'
+START = '# BEGIN SISTFARMA SISCOFIS 1.4.6'
+END = '# END SISTFARMA SISCOFIS 1.4.6'
 HOOK = START + '''
 from recebimentos_siscofis import instalar as _instalar_siscofis
 _instalar_siscofis(app, _conn, _lock, _agora, _exigir_login, CATEGORIAS)
@@ -27,7 +27,7 @@ def atualizar(root=Path('/'), remove=False):
     source = root / 'opt/farmacia-servidor/servidor_estoque.py'
     original = source.read_text(encoding='utf-8')
     text = original
-    for version in ('1.4.2', '1.4.3', '1.4.4', '1.4.5'):
+    for version in ('1.4.2', '1.4.3', '1.4.4', '1.4.5', '1.4.6'):
         first = '# BEGIN SISTFARMA SISCOFIS ' + version
         last = '# END SISTFARMA SISCOFIS ' + version
         if first in text:

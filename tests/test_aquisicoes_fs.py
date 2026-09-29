@@ -6,6 +6,29 @@ from test_siscofis import SiscofisTests
 
 
 class AcquisitionTests(SiscofisTests):
+    def test_multiple_items_same_company_and_partial_edit(self):
+        company=self.call('/empresas-fs','POST',{'nome':'Empresa de dois itens'})[1]['id']
+        items=[{'item':'1','codigo_catmat_catserv':'123456','descricao':'Material A',
+                'unidade':'UN','quantidade':'10','nd_si':'3.3.90.30','preco_unitario':'25.00'},
+               {'item':'2','codigo_catmat_catserv':'789012','descricao':'Material B',
+                'unidade':'CX','quantidade':'3','nd_si':'3.3.90.30','preco_unitario':'40.00'}]
+        code,created=self.call('/aquisicoes-fs','POST',{'empresa_id':company,'itens':items})
+        self.assertEqual(code,200,created)
+        ident=created['id']
+        row=next(x for x in self.call('/aquisicoes-fs')[1]['aquisicoes'] if x['id']==ident)
+        self.assertEqual([x['preco_total'] for x in row['itens']],['250.00','120.00'])
+        self.assertEqual(row['empresa_nome'],'Empresa de dois itens')
+        self.assertEqual(row['etapa'],'CADASTRO_INICIAL')
+        self.assertEqual(row['material'],'Material A')
+        updated={'empresa_id':company,'material':'Material A','itens':items,
+                 'empenho_data':date.today().isoformat()}
+        self.assertEqual(self.call('/aquisicoes-fs/'+str(ident),'PUT',updated)[0],200)
+        row=next(x for x in self.call('/aquisicoes-fs')[1]['aquisicoes'] if x['id']==ident)
+        self.assertEqual(len(row['itens']),2)
+        self.assertEqual(row['etapa'],'AGUARDANDO_ENTREGA')
+        self.assertEqual(self.call('/aquisicoes-fs','POST',{'itens':[{**items[0],'quantidade':'-1'}]})[0],400)
+        self.assertEqual(self.call('/aquisicoes-fs','POST',{'itens':[{'descricao':''}]})[0],400)
+
     def test_staged_acquisition_company_and_deadline(self):
         code, company = self.call('/empresas-fs', 'POST',
                                   {'nome':'Fornecedor QA','cnpj':'00.000.000/0001-00','telefone':'123','email':'qa@example.org'})

@@ -15,7 +15,7 @@ import time
 from urllib import error, parse, request
 import webbrowser
 
-VERSION = '1.4.5'
+VERSION = '1.4.6'
 DEFAULT_SERVER = 'http://10.56.121.242:5000'
 
 

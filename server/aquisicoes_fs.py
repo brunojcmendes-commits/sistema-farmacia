@@ -1,5 +1,6 @@
 """Aquisições FS, cadastro de empresas e itens solicitados/autorizados do PAASSEx."""
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 from flask import jsonify, request
 
 
@@ -82,6 +83,15 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
           autorizado INTEGER NOT NULL DEFAULT 0,
           criado_em TEXT NOT NULL, atualizado_em TEXT NOT NULL,
           autorizado_em TEXT NOT NULL DEFAULT '', autorizado_por TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS aquisicoes_fs_itens (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, aquisicao_id INTEGER NOT NULL,
+          posicao INTEGER NOT NULL, item TEXT NOT NULL DEFAULT '',
+          codigo_catmat_catserv TEXT NOT NULL DEFAULT '', descricao TEXT NOT NULL DEFAULT '',
+          unidade TEXT NOT NULL DEFAULT '', quantidade TEXT NOT NULL DEFAULT '',
+          nd_si TEXT NOT NULL DEFAULT '', preco_unitario TEXT NOT NULL DEFAULT '',
+          preco_total TEXT NOT NULL DEFAULT '',
+          FOREIGN KEY(aquisicao_id) REFERENCES aquisicoes_fs(id) ON DELETE CASCADE);
+        CREATE INDEX IF NOT EXISTS idx_aquisicoes_itens ON aquisicoes_fs_itens(aquisicao_id,posicao);
         CREATE INDEX IF NOT EXISTS idx_aquisicoes_empenho ON aquisicoes_fs(empenho_data);
         CREATE INDEX IF NOT EXISTS idx_paassex_ano ON paassex_itens(ano);
         """)
@@ -171,7 +181,15 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
             try:
                 rows = c.execute("""SELECT a.*,e.nome AS empresa_nome FROM aquisicoes_fs a
                     LEFT JOIN empresas_fs e ON e.id=a.empresa_id ORDER BY a.id DESC""")
-                return jsonify(aquisicoes=[_status(r) for r in rows])
+                result = [_status(r) for r in rows]
+                for acquisition in result:
+                    acquisition['itens'] = [dict(x) for x in c.execute(
+                        'SELECT * FROM aquisicoes_fs_itens WHERE aquisicao_id=? ORDER BY posicao,id', (acquisition['id'],))]
+                    if not acquisition['itens'] and acquisition['material']:
+                        acquisition['itens'] = [{'item':'1','codigo_catmat_catserv':'',
+                            'descricao':acquisition['material'],'unidade':'','quantidade':'',
+                            'nd_si':'','preco_unitario':'','preco_total':''}]
+                return jsonify(aquisicoes=result)
             finally:
                 c.close()
         return salvar_aquisicao(None, usuario)
@@ -180,6 +198,32 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
         try:
             d = body()
             data = {k: _texto(d.get(k), 1000 if k == "observacao" else 240) for k in CAMPOS}
+            raw_items = d.get('itens')
+            if raw_items is not None and (not isinstance(raw_items, list) or len(raw_items) > 200):
+                raise ValueError('Lista de itens inválida ou acima de 200 itens.')
+            items = []
+            for index, raw in enumerate(raw_items or []):
+                if not isinstance(raw, dict):
+                    raise ValueError('Item inválido.')
+                item = {key:_texto(raw.get(key), 1000 if key=='descricao' else 120)
+                        for key in ('item','codigo_catmat_catserv','descricao','unidade','quantidade','nd_si','preco_unitario')}
+                if not item['descricao']:
+                    raise ValueError('Informe a descrição de cada item.')
+                item['item'] = item['item'] or str(index+1)
+                item['preco_total'] = ''
+                if item['quantidade'] or item['preco_unitario']:
+                    try:
+                        qty = Decimal(item['quantidade'].replace(',','.')) if item['quantidade'] else None
+                        price = Decimal(item['preco_unitario'].replace(',','.')) if item['preco_unitario'] else None
+                        if qty is not None and (not qty.is_finite() or qty < 0): raise ValueError()
+                        if price is not None and (not price.is_finite() or price < 0): raise ValueError()
+                        if qty is not None and price is not None:
+                            item['preco_total'] = str((qty * price).quantize(Decimal('0.01')))
+                    except (InvalidOperation, ValueError):
+                        raise ValueError('Quantidade e preço unitário devem ser números não negativos.')
+                items.append(item)
+            if items:
+                data['material'] = data['material'] or items[0]['descricao'][:240]
             if not data["material"]:
                 raise ValueError("Informe o material ou serviço.")
             if data["tipo"] and data["tipo"] not in TIPOS:
@@ -204,6 +248,12 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
                                         ",atualizado_em=? WHERE id=?", values + (agora(), ident))
                         if not cur.rowcount:
                             return jsonify(erro="Aquisição não encontrada."), 404
+                    if raw_items is not None:
+                        c.execute('DELETE FROM aquisicoes_fs_itens WHERE aquisicao_id=?', (ident,))
+                        for position, item in enumerate(items):
+                            c.execute('''INSERT INTO aquisicoes_fs_itens
+                                (aquisicao_id,posicao,item,codigo_catmat_catserv,descricao,unidade,quantidade,nd_si,preco_unitario,preco_total)
+                                VALUES(?,?,?,?,?,?,?,?,?,?)''', (ident,position,*item.values()))
                     c.commit()
                 finally:
                     c.close()

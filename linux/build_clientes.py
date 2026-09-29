@@ -9,7 +9,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '1.4.5'
+VERSION = '1.4.6'
 TARGETS = [('Ubuntu_22.04', 'Ubuntu 22.04'), ('Mint_20.3', 'Linux Mint 20.3')]
 
 
