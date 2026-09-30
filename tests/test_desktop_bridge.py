@@ -46,8 +46,11 @@ class BridgeTests(unittest.TestCase):
     def test_acquisitions_and_user_management_routing(self):
         self.b.user={'id':1,'perfil':'gerente','trocar_senha':False}
         for method,path in [('GET','/aquisicoes-fs'),('GET','/empresas-fs'),
-                            ('GET','/paassex'),('POST','/paassex/autorizacoes'),
+                            ('GET','/ncs-fs'),('GET','/paassex'),('POST','/paassex/autorizacoes'),
                             ('PUT','/aquisicoes-fs/2'),('PUT','/empresas-fs/3'),
+                            ('PUT','/paassex/5'),('DELETE','/aquisicoes-fs/2'),
+                            ('DELETE','/empresas-fs/3'),('DELETE','/ncs-fs/4'),
+                            ('DELETE','/paassex/5'),
                             ('POST','/usuarios/4/senha'),('DELETE','/usuarios/4')]:
             self.assertEqual(self.b.dispatch(method,path,{} )[0],200,(method,path))
         self.b.user={'id':2,'perfil':'administrador','trocar_senha':False}

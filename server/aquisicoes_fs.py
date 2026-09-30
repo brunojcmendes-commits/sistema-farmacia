@@ -46,6 +46,19 @@ def _valor(value, label='Valor', optional=False):
         raise ValueError(label + ' deve ser positivo ou zero, com até duas casas decimais.')
 
 
+def _quantidade(value):
+    raw = _texto(value, 40).replace(',', '.')
+    if not raw:
+        return ''
+    try:
+        number = Decimal(raw)
+        if not number.is_finite() or number < 0 or number.as_tuple().exponent < -3:
+            raise ValueError()
+        return format(number, 'f')
+    except (InvalidOperation, ValueError):
+        raise ValueError('Quantidade deve ser não negativa, com até três casas decimais.')
+
+
 def _ncs(c):
     rows = [dict(r) for r in c.execute('SELECT * FROM notas_credito_fs ORDER BY data DESC,id DESC')]
     spent = {}
@@ -132,6 +145,13 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
             con.execute("ALTER TABLE paassex_itens ADD COLUMN valor TEXT NOT NULL DEFAULT ''")
         if 'pregao' not in pa_columns:
             con.execute("ALTER TABLE paassex_itens ADD COLUMN pregao TEXT NOT NULL DEFAULT ''")
+        if 'quantidade' not in pa_columns:
+            con.execute("ALTER TABLE paassex_itens ADD COLUMN quantidade TEXT NOT NULL DEFAULT ''")
+        if 'valor_unitario' not in pa_columns:
+            con.execute("ALTER TABLE paassex_itens ADD COLUMN valor_unitario TEXT NOT NULL DEFAULT ''")
+        # O valor antigo representava o total de um item; conserva-o como uma unidade.
+        con.execute("""UPDATE paassex_itens SET quantidade='1',valor_unitario=valor
+                       WHERE valor<>'' AND quantidade='' AND valor_unitario=''""")
         con.commit()
     finally:
         con.close()
@@ -208,6 +228,23 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
         except ValueError as exc:
             return jsonify(erro=str(exc)), 400
 
+    @app.route('/empresas-fs/<int:ident>', methods=['DELETE'])
+    def excluir_empresa_fs(ident):
+        usuario, erro = autorizado()
+        if erro: return erro
+        with lock:
+            c = conn_factory()
+            try:
+                if c.execute('SELECT 1 FROM aquisicoes_fs WHERE empresa_id=? LIMIT 1', (ident,)).fetchone():
+                    return jsonify(erro='Empresa vinculada a aquisições. Altere essas aquisições antes de excluir.'), 409
+                row = c.execute('SELECT nome FROM empresas_fs WHERE id=?', (ident,)).fetchone()
+                if not row: return jsonify(erro='Empresa não encontrada.'), 404
+                c.execute('DELETE FROM empresas_fs WHERE id=?', (ident,))
+                c.commit()
+            finally: c.close()
+        audit('EXCLUIR_EMPRESA_FS', 'empresas_fs', ident, row['nome'], usuario=usuario['usuario'])
+        return jsonify(ok=True)
+
     @app.route('/ncs-fs', methods=['GET','POST'])
     def notas_credito_fs():
         usuario, erro = autorizado()
@@ -252,6 +289,23 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
         usuario, erro = autorizado()
         if erro: return erro
         return salvar_nc(ident,usuario)
+
+    @app.route('/ncs-fs/<int:ident>', methods=['DELETE'])
+    def excluir_nc_fs(ident):
+        usuario, erro = autorizado()
+        if erro: return erro
+        with lock:
+            c = conn_factory()
+            try:
+                if c.execute('SELECT 1 FROM aquisicoes_fs_itens WHERE nc_id=? LIMIT 1', (ident,)).fetchone():
+                    return jsonify(erro='NC vinculada a itens. Altere os itens antes de excluir.'), 409
+                row = c.execute('SELECT numero FROM notas_credito_fs WHERE id=?', (ident,)).fetchone()
+                if not row: return jsonify(erro='NC não encontrada.'), 404
+                c.execute('DELETE FROM notas_credito_fs WHERE id=?', (ident,))
+                c.commit()
+            finally: c.close()
+        audit('EXCLUIR_NC_FS', 'notas_credito_fs', ident, row['numero'], usuario=usuario['usuario'])
+        return jsonify(ok=True)
 
     @app.route("/aquisicoes-fs", methods=["GET", "POST"])
     def aquisicoes_fs():
@@ -362,6 +416,22 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
             return erro
         return salvar_aquisicao(ident, usuario)
 
+    @app.route('/aquisicoes-fs/<int:ident>', methods=['DELETE'])
+    def excluir_aquisicao_fs(ident):
+        usuario, erro = autorizado()
+        if erro: return erro
+        with lock:
+            c = conn_factory()
+            try:
+                row = c.execute('SELECT material FROM aquisicoes_fs WHERE id=?', (ident,)).fetchone()
+                if not row: return jsonify(erro='Aquisição não encontrada.'), 404
+                c.execute('DELETE FROM aquisicoes_fs_itens WHERE aquisicao_id=?', (ident,))
+                c.execute('DELETE FROM aquisicoes_fs WHERE id=?', (ident,))
+                c.commit()
+            finally: c.close()
+        audit('EXCLUIR_AQUISICAO_FS', 'aquisicoes_fs', ident, row['material'], usuario=usuario['usuario'])
+        return jsonify(ok=True)
+
     @app.route('/paassex',methods=['GET','POST'])
     def paassex():
         usuario, erro = autorizado()
@@ -378,7 +448,17 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
             d = body()
             ano = int(d.get('ano'))
             nome, descricao = _texto(d.get('nome'),240),_texto(d.get('descricao'),2000)
-            valor, pregao = _valor(d.get('valor'),'Valor do item',optional=True),_texto(d.get('pregao'),120)
+            pregao = _texto(d.get('pregao'),120)
+            # Aceita o cadastro anterior que enviava apenas o valor total.
+            old_format = 'quantidade' not in d and 'valor_unitario' not in d
+            quantidade = _quantidade(d.get('quantidade') if not old_format else
+                                     ('1' if _texto(d.get('valor')) else ''))
+            unitario = _valor(d.get('valor_unitario') if not old_format else d.get('valor'),
+                             'Valor unitário', optional=True)
+            if quantidade and unitario:
+                valor = str((Decimal(quantidade) * Decimal(unitario)).quantize(Decimal('0.01')))
+            else:
+                valor = ''
             if not 2000 <= ano <= 2100 or not nome or not descricao:
                 raise ValueError('Informe ano, nome e descrição do item.')
             with lock:
@@ -386,13 +466,13 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
                 try:
                     if ident is None:
                         cur = c.execute("""INSERT INTO paassex_itens
-                            (ano,nome,descricao,valor,pregao,criado_em,atualizado_em)
-                            VALUES(?,?,?,?,?,?,?)""",(ano,nome,descricao,valor,pregao,agora(),agora()))
+                            (ano,nome,descricao,valor,pregao,quantidade,valor_unitario,criado_em,atualizado_em)
+                            VALUES(?,?,?,?,?,?,?,?,?)""",(ano,nome,descricao,valor,pregao,quantidade,unitario,agora(),agora()))
                         ident = cur.lastrowid
                     else:
                         cur = c.execute("""UPDATE paassex_itens SET
-                            ano=?,nome=?,descricao=?,valor=?,pregao=?,atualizado_em=? WHERE id=?""",
-                            (ano,nome,descricao,valor,pregao,agora(),ident))
+                            ano=?,nome=?,descricao=?,valor=?,pregao=?,quantidade=?,valor_unitario=?,atualizado_em=? WHERE id=?""",
+                            (ano,nome,descricao,valor,pregao,quantidade,unitario,agora(),ident))
                         if not cur.rowcount: return jsonify(erro='Item PAASSEx não encontrado.'),404
                     c.commit()
                 finally: c.close()
@@ -407,6 +487,21 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
         usuario, erro = autorizado()
         if erro: return erro
         return salvar_paassex(ident,usuario)
+
+    @app.route('/paassex/<int:ident>', methods=['DELETE'])
+    def excluir_paassex(ident):
+        usuario, erro = autorizado()
+        if erro: return erro
+        with lock:
+            c = conn_factory()
+            try:
+                row = c.execute('SELECT nome FROM paassex_itens WHERE id=?', (ident,)).fetchone()
+                if not row: return jsonify(erro='Item PAASSEx não encontrado.'), 404
+                c.execute('DELETE FROM paassex_itens WHERE id=?', (ident,))
+                c.commit()
+            finally: c.close()
+        audit('EXCLUIR_ITEM_PAASSEX', 'paassex_itens', ident, row['nome'], usuario=usuario['usuario'])
+        return jsonify(ok=True)
 
     @app.route("/paassex/autorizacoes", methods=["POST"])
     def autorizar_paassex():

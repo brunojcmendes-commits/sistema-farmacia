@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory() as directory:
     for name in ('recebimentos_siscofis.py', 'localizador_estoque.py', 'externos_estoque.py', 'aquisicoes_fs.py', 'usuarios_gestao.py', 'instalar_extensao.py'):
         shutil.copy2(here / name, target / name)
     (control / 'control').write_text('''Package: farmacia-conferencia-siscofis
-Version: 1.4.7
+Version: 1.4.8
 Section: misc
 Priority: optional
 Architecture: all

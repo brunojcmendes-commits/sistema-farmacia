@@ -15,7 +15,7 @@ import time
 from urllib import error, parse, request
 import webbrowser
 
-VERSION = '1.4.7'
+VERSION = '1.4.8'
 DEFAULT_SERVER = 'http://10.56.121.242:5000'
 
 
@@ -157,7 +157,7 @@ class Bridge:
         allowed['GET'] += r'|/(aquisicoes-fs|empresas-fs|ncs-fs|paassex)'
         allowed['POST'] += r'|/(aquisicoes-fs|empresas-fs|ncs-fs|paassex|paassex/autorizacoes|usuarios/\d+/senha)'
         allowed['PUT'] += r'|/(aquisicoes-fs|empresas-fs|ncs-fs|paassex)/\d+'
-        allowed['DELETE'] += r'|/usuarios/\d+'
+        allowed['DELETE'] += r'|/(usuarios|aquisicoes-fs|empresas-fs|ncs-fs|paassex)/\d+'
         if method not in allowed or not re.fullmatch(allowed[method], endpoint):
             return 404, {'erro': 'Operação não disponível.'}
         if self.user and self.user.get('trocar_senha') and endpoint != '/minha-senha':

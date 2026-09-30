@@ -7,7 +7,7 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
   };
   const shortDate = value => value ? value.split('-').reverse().join('/') : '—';
   const money = value => value!==''&&value!==null&&value!==undefined ? Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
-  const tabs = [['aquisicoes','Aquisições FS'],['empresas','Empresas'],['ncs','NCs'],['paassex','PAASSEx']];
+  const tabs = [['compras','COMPRAS'],['paassex','PAASSEx']];
   const ncTipos={consumo:'Consumo',servico:'Serviço',permanente:'Permanente'};
   const sum=rows=>rows.reduce((total,x)=>total+(Number(x.valor)||0),0);
   const ncById=id=>(S.ncsFS||[]).find(x=>x.id===Number(id));
@@ -45,30 +45,29 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
       <div class="metric"><span>Entrega atrasada</span><strong>${overdue}</strong></div>
       <div class="metric"><span>Até 7 dias</span><strong>${soon}</strong></div>
       <div class="metric"><span>Entregues</span><strong>${done}</strong></div></div>
-      <div class="toolbar"><span class="subtle">Cadastre dados parciais e complete as etapas pelo botão Editar.</span>
-      <button class="button" data-fs="new-acquisition">+ Nova aquisição</button>
-      <button class="button secondary" data-fs="print-acquisitions">Imprimir relatório</button></div>
-      ${panel('Acompanhamento',S.aquisicoesFS===null?errorView():
+      <div class="toolbar"><button class="button secondary" data-fs="new-nc">+ Cadastro de NCs</button>
+      <button class="button secondary" data-fs="new-company">+ Cadastro de Empresas</button>
+      <button class="button" data-fs="new-acquisition">+ Cadastro de Item</button>
+      <button class="button secondary" data-fs="print-acquisitions">Imprimir relatório geral</button></div>
+      ${panel('Prévia do relatório de aquisições',S.aquisicoesFS===null?errorView():
         table(['Itens / material','Tipo','Requisição','Empenho','Empresa','Prazo 30 dias','Rastreio','Entrega','Situação',''],
           rows.map(x=>[`<b>${esc(x.material)}</b><small>${x.itens?.length||1} item(ns)</small>`,esc(tipos[x.tipo]||'—'),
             esc(x.requisicao_numero||'—'),esc(x.empenho_numero||'—'),esc(x.empresa_nome||'—'),
             shortDate(x.prazo_30_dias),esc(x.rastreio||'—'),shortDate(x.entrega_data),
-            acquisitionStatus(x),button('Editar','edit-acquisition',x.id)])))}`;
+            acquisitionStatus(x),button('Editar','edit-acquisition',x.id)+' '+button('Excluir','delete-acquisition',x.id)])))}`;
   }
   function renderCompanies() {
-    return `<div class="toolbar"><button class="button" data-fs="new-company">+ Cadastrar empresa</button>
-      <button class="button secondary" data-fs="print-companies">Imprimir relatório</button></div>
-      ${panel('Empresas cadastradas',S.empresasFS===null?errorView():
+    return panel('Empresas cadastradas',S.empresasFS===null?errorView():
         table(['Empresa','CNPJ','Telefone','E-mail',''],(S.empresasFS||[]).map(x=>[
-          esc(x.nome),esc(x.cnpj),esc(x.telefone),esc(x.email),button('Editar','edit-company',x.id)])))}`;
+          esc(x.nome),esc(x.cnpj),esc(x.telefone),esc(x.email),
+          button('Editar','edit-company',x.id)+' '+button('Excluir','delete-company',x.id)])));
   }
   function renderNcs() {
-    return `<div class="toolbar"><button class="button" data-fs="new-nc">+ Cadastrar NC</button></div>
-      ${panel('Notas de crédito',S.ncsFS===null?errorView():
+    return panel('Notas de crédito',S.ncsFS===null?errorView():
         table(['Data','Tipo','UG','Número','Valor','Utilizado','Crédito restante',''],(S.ncsFS||[]).map(x=>[
           shortDate(x.data),esc(ncTipos[x.tipo]||x.tipo),esc(x.ug),esc(x.numero),money(x.valor),
           money(x.utilizado),Number(x.saldo)<0?'<span class="danger-text">Excedido: '+money(-Number(x.saldo))+'</span>':money(x.saldo),
-          button('Editar','edit-nc',x.id)])))}`;
+          button('Editar','edit-nc',x.id)+' '+button('Excluir','delete-nc',x.id)])));
   }
   function renderPaassex() {
     const rows=S.paassex||[], filter=S.fsYear||'';
@@ -80,23 +79,24 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
       <label class="field">Ano<select id="fsYear"><option value="">Todos</option>${options}</select></label>
       <button class="button secondary" data-fs="print-paassex">Imprimir relatório</button></div>
       ${panel('Itens solicitados',S.paassex===null?errorView():
-        table(['Selecionar','Ano','Item','Descrição','Valor','Pregão',''],requested.map(x=>[
+        table(['Selecionar','Ano','Item','Descrição','QTD','Valor unit.','Total','Pregão',''],requested.map(x=>[
           `<input type="checkbox" data-paass-select="${x.id}" aria-label="Selecionar ${esc(x.nome)}" ${S.fsSelected?.has(x.id)?'checked':''}>`,
-          esc(x.ano),esc(x.nome),esc(x.descricao),money(x.valor),esc(x.pregao||'—'),button('Editar','edit-paassex',x.id)]))+
+          esc(x.ano),esc(x.nome),esc(x.descricao),esc(x.quantidade||'—'),money(x.valor_unitario),money(x.valor),esc(x.pregao||'—'),
+          button('Editar','edit-paassex',x.id)+' '+button('Excluir','delete-paassex',x.id)]))+
           `<p class="fs-total">Total solicitado: <strong>${money(sum(requested))}</strong></p><div class="actions"><button class="button" data-fs="authorize">Autorizar selecionados</button></div>`)}
       ${panel('Itens autorizados',S.paassex===null?errorView():
-        table(['Ano','Item','Descrição','Valor','Pregão','Autorizado em',''],approved.map(x=>[
-          esc(x.ano),esc(x.nome),esc(x.descricao),money(x.valor),esc(x.pregao||'—'),esc(x.autorizado_em||'—'),
-          button('Editar','edit-paassex',x.id)+' '+button('Voltar a solicitado','revoke',x.id)]))+
+        table(['Ano','Item','Descrição','QTD','Valor unit.','Total','Pregão','Autorizado em',''],approved.map(x=>[
+          esc(x.ano),esc(x.nome),esc(x.descricao),esc(x.quantidade||'—'),money(x.valor_unitario),money(x.valor),esc(x.pregao||'—'),esc(x.autorizado_em||'—'),
+          button('Editar','edit-paassex',x.id)+' '+button('Excluir','delete-paassex',x.id)+' '+button('Voltar a solicitado','revoke',x.id)]))+
           `<p class="fs-total">Total autorizado: <strong>${money(sum(approved))}</strong></p>`)}`;
   }
   function errorView() {
     return `<div class="empty">Não foi possível carregar: ${esc(S.errors.aquisicoesFS||'Atualize o servidor.')}</div>`;
   }
   function renderArea() {
-    S.fsTab=S.fsTab||'aquisicoes';
+    S.fsTab=S.fsTab==='paassex'?'paassex':'compras';
     document.querySelector('#content').innerHTML=tabBar()+
-      (S.fsTab==='empresas'?renderCompanies():S.fsTab==='ncs'?renderNcs():S.fsTab==='paassex'?renderPaassex():renderAcquisitions());
+      (S.fsTab==='paassex'?renderPaassex():renderAcquisitions()+renderNcs()+renderCompanies());
   }
   function companyForm(id, returnToAcquisition) {
     const company=id?S.empresasFS.find(x=>x.id===id):null;
@@ -185,7 +185,9 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
     formDialog(item?'Editar item · PAASSEx':'Cadastrar item solicitado · PAASSEx',
       `<div class="form-grid">${field('Ano','ano',item?.ano||new Date().getFullYear(),'number','required min="2000" max="2100"')}
       ${field('Nome do item','nome',item?.nome||'','text','required maxlength="240"')}
-      ${field('Valor (R$)','valor',item?.valor||'','number','min="0" step="0.01"')}
+      ${field('Quantidade','quantidade',item?.quantidade||'','number','min="0" step="any"')}
+      ${field('Valor unitário (R$)','valor_unitario',item?.valor_unitario||'','number','min="0" step="0.01"')}
+      <label class="field">Valor total<input id="paassexTotal" readonly value="${esc(item?.valor||'')}" aria-label="Valor total calculado"></label>
       ${field('Pregão','pregao',item?.pregao||'','text','maxlength="120"')}
       <label class="field wide">Descrição<textarea name="descricao" required maxlength="2000">${esc(item?.descricao||'')}</textarea></label></div>`,
       async data=>{await api('/paassex'+(id?'/'+id:''),id?'PUT':'POST',data);
@@ -219,6 +221,16 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
     if(fs==='edit-acquisition'){S.fsEditingAcquisition=Number(id);acquisitionForm(Number(id));return true}
     if(fs==='new-paassex'){paassexForm();return true}
     if(fs==='edit-paassex'){paassexForm(Number(id));return true}
+    if(fs.startsWith('delete-')){
+      const kind=fs.slice(7);
+      const target={acquisition:['Aquisição','/aquisicoes-fs'],company:['Empresa','/empresas-fs'],
+        nc:['NC','/ncs-fs'],paassex:['Item PAASSEx','/paassex']}[kind];
+      if(!target)return false;
+      formDialog('Excluir '+target[0],`<p>Excluir ${target[0].toLowerCase()} nº ${esc(id)}? A exclusão será registrada na Auditoria.</p>`,
+        async()=>{await api(target[1]+'/'+id,'DELETE',{});S.fsSelected?.delete(Number(id));await load();toast(target[0]+' excluído.');},
+        'Confirmar exclusão');
+      return true;
+    }
     if(fs==='authorize'||fs==='revoke'){
       const ids=fs==='revoke'?[Number(id)]:[...(S.fsSelected||[])];
       if(!ids.length)throw Error('Selecione ao menos um item solicitado.');
@@ -239,10 +251,10 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
       if(type==='paassex'){
         const requested=(S.paassex||[]).filter(x=>!x.autorizado),approved=(S.paassex||[]).filter(x=>x.autorizado);
         printHtml('PAASSEx',`<h2>Itens solicitados</h2>`+
-          table(['Ano','Item','Descrição','Valor','Pregão'],requested.map(x=>[esc(x.ano),esc(x.nome),esc(x.descricao),money(x.valor),esc(x.pregao||'—')]))+
+          table(['Ano','Item','Descrição','QTD','Valor unitário','Total','Pregão'],requested.map(x=>[esc(x.ano),esc(x.nome),esc(x.descricao),esc(x.quantidade||'—'),money(x.valor_unitario),money(x.valor),esc(x.pregao||'—')]))+
           `<p>Total solicitado: <strong>${money(sum(requested))}</strong></p><h2>Itens autorizados</h2>`+
-          table(['Ano','Item','Descrição','Valor','Pregão','Autorizado em'],approved.map(x=>[
-            esc(x.ano),esc(x.nome),esc(x.descricao),money(x.valor),esc(x.pregao||'—'),esc(x.autorizado_em||'—')]))+
+          table(['Ano','Item','Descrição','QTD','Valor unitário','Total','Pregão','Autorizado em'],approved.map(x=>[
+            esc(x.ano),esc(x.nome),esc(x.descricao),esc(x.quantidade||'—'),money(x.valor_unitario),money(x.valor),esc(x.pregao||'—'),esc(x.autorizado_em||'—')]))+
           `<p>Total autorizado: <strong>${money(sum(approved))}</strong></p>`);
       }
       return true;
@@ -250,6 +262,11 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
     return false;
   }
   function change(element) {
+    if(['quantidade','valor_unitario'].includes(element.name)&&element.closest('#modalForm')&&document.querySelector('#paassexTotal')){
+      const form=element.form,qty=form.elements.quantidade.value,price=form.elements.valor_unitario.value;
+      document.querySelector('#paassexTotal').value=qty!==''&&price!==''?(Number(qty)*Number(price)).toFixed(2):'';
+      return true;
+    }
     const row=element.closest('[data-fs-item]');
     if(row&&['quantidade','preco_unitario'].includes(element.name)){
       const qty=Number(row.querySelector('[name="quantidade"]').value),price=Number(row.querySelector('[name="preco_unitario"]').value);

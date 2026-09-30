@@ -21,21 +21,21 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Validar API da versão 1.4.7
+      - name: Validar API da versão 1.4.8
         run: |
           python3 -m py_compile server/aquisicoes_fs.py
           timeout 90s python3 -m unittest discover -s tests -p 'test_*.py' -v
       - name: Gerar atualizacao offline do servidor
-        run: python3 server/build_deb.py dist/Servidor_Farmacia_Aquisicoes_FS_1.4.7_all.deb
+        run: python3 server/build_deb.py dist/Servidor_Farmacia_Aquisicoes_FS_1.4.8_all.deb
       - name: Validar scripts do pacote
         run: |
-          dpkg-deb --info dist/Servidor_Farmacia_Aquisicoes_FS_1.4.7_all.deb
-          dpkg-deb --control dist/Servidor_Farmacia_Aquisicoes_FS_1.4.7_all.deb /tmp/siscofis-control
+          dpkg-deb --info dist/Servidor_Farmacia_Aquisicoes_FS_1.4.8_all.deb
+          dpkg-deb --control dist/Servidor_Farmacia_Aquisicoes_FS_1.4.8_all.deb /tmp/siscofis-control
           sh -n /tmp/siscofis-control/preinst /tmp/siscofis-control/postinst /tmp/siscofis-control/prerm
       - uses: actions/upload-artifact@v4
         with:
-          name: Servidor-Farmacia-Aquisicoes-FS-1.4.7
-          path: dist/Servidor_Farmacia_Aquisicoes_FS_1.4.7_all.deb
+          name: Servidor-Farmacia-Aquisicoes-FS-1.4.8
+          path: dist/Servidor_Farmacia_Aquisicoes_FS_1.4.8_all.deb
           if-no-files-found: error
           retention-days: 30
   compilar:
@@ -112,7 +112,7 @@ jobs:
       - name: Publicar instalador para download
         uses: actions/upload-artifact@v4
         with:
-          name: Sistema-Farmacia-Windows-1.4.7
-          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.7.exe
+          name: Sistema-Farmacia-Windows-1.4.8
+          path: windows/installer/Saida/Sistema_Farmacia_Setup_1.4.8.exe
           if-no-files-found: error
           retention-days: 30

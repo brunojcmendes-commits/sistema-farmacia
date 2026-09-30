@@ -6,6 +6,40 @@ from test_siscofis import SiscofisTests
 
 
 class AcquisitionTests(SiscofisTests):
+    def test_purchases_delete_and_paassex_quantity_total(self):
+        company=self.call('/empresas-fs','POST',{'nome':'Empresa para exclusão'})[1]['id']
+        nc=self.call('/ncs-fs','POST',{'data':'2026-09-30','tipo':'consumo',
+            'ug':'160001','numero':'NC-EXCLUSAO','valor':'2000'})[1]['id']
+        code,acquisition=self.call('/aquisicoes-fs','POST',{'empresa_id':company,'itens':[
+            {'descricao':'Item teste','quantidade':'3','preco_unitario':'500','nc_id':nc}]})
+        self.assertEqual(code,200,acquisition)
+        self.assertEqual(self.call('/empresas-fs/'+str(company),'DELETE')[0],409)
+        self.assertEqual(self.call('/ncs-fs/'+str(nc),'DELETE')[0],409)
+        self.assertEqual(self.call('/aquisicoes-fs/'+str(acquisition['id']),'DELETE')[0],200)
+        self.assertEqual(next(x for x in self.call('/ncs-fs')[1]['ncs'] if x['id']==nc)['saldo'],'2000.00')
+        self.assertEqual(self.call('/ncs-fs/'+str(nc),'DELETE')[0],200)
+        self.assertEqual(self.call('/empresas-fs/'+str(company),'DELETE')[0],200)
+
+        code,item=self.call('/paassex','POST',{'ano':2026,'nome':'Material',
+            'descricao':'Teste','quantidade':'3','valor_unitario':'150.00','pregao':'PE-1'})
+        self.assertEqual(code,200,item)
+        ident=item['id']
+        row=next(x for x in self.call('/paassex')[1]['itens'] if x['id']==ident)
+        self.assertEqual((row['quantidade'],row['valor_unitario'],row['valor']),('3','150.00','450.00'))
+        self.assertEqual(self.call('/paassex/autorizacoes','POST',{'ids':[ident],'autorizado':True})[0],200)
+        self.assertEqual(self.call('/paassex/'+str(ident),'PUT',{'ano':2026,'nome':'Material',
+            'descricao':'Teste','quantidade':'4','valor_unitario':'150.00','pregao':'PE-2'})[0],200)
+        row=next(x for x in self.call('/paassex')[1]['itens'] if x['id']==ident)
+        self.assertEqual((row['autorizado'],row['valor'],row['pregao']),(1,'600.00','PE-2'))
+        self.assertEqual(self.call('/paassex/'+str(ident),'DELETE')[0],200)
+        self.assertFalse(any(x['id']==ident for x in self.call('/paassex')[1]['itens']))
+        code,legacy=self.call('/paassex','POST',{'ano':2026,'nome':'Legado',
+            'descricao':'Valor anterior','valor':'125.00'})
+        self.assertEqual(code,200,legacy)
+        old=next(x for x in self.call('/paassex')[1]['itens'] if x['id']==legacy['id'])
+        self.assertEqual((old['quantidade'],old['valor_unitario'],old['valor']),
+                         ('1','125.00','125.00'))
+
     def test_multiple_items_same_company_and_partial_edit(self):
         company=self.call('/empresas-fs','POST',{'nome':'Empresa de dois itens'})[1]['id']
         items=[{'item':'1','codigo_catmat_catserv':'123456','descricao':'Material A',
