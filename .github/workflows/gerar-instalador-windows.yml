@@ -21,6 +21,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - name: Validar API da versão 1.4.7
+        run: |
+          python3 -m py_compile server/aquisicoes_fs.py
+          timeout 90s python3 -m unittest discover -s tests -p 'test_*.py' -v
       - name: Gerar atualizacao offline do servidor
         run: python3 server/build_deb.py dist/Servidor_Farmacia_Aquisicoes_FS_1.4.7_all.deb
       - name: Validar scripts do pacote
