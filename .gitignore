@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.spec
+windows/src/build/
+windows/src/dist/
+windows/installer/Arquivos_do_Programa/
+windows/installer/Saida/
+qa/
+node_modules/
