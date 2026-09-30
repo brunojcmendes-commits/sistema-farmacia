@@ -192,6 +192,9 @@ export function createAquisicoesFS({api,esc,table,panel,field,formDialog,printHt
       <label class="field wide">Descrição<textarea name="descricao" required maxlength="2000">${esc(item?.descricao||'')}</textarea></label></div>`,
       async data=>{await api('/paassex'+(id?'/'+id:''),id?'PUT':'POST',data);
         await load();toast('Item PAASSEx salvo.');});
+    document.querySelector('#modalForm').addEventListener('input',event=>{
+      if(['quantidade','valor_unitario'].includes(event.target.name))change(event.target);
+    });
   }
   async function click(button) {
     const {fs,id}=button.dataset;
