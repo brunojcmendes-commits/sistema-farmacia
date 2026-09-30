@@ -57,6 +57,46 @@ class AcquisitionTests(SiscofisTests):
         self.assertEqual(row['alerta'],'')
         self.assertEqual(self.call('/aquisicoes-fs','POST',{'material':'X','tipo':'invalido'})[0],400)
 
+    def test_nc_balance_across_acquisitions_and_paassex_values(self):
+        code, nc = self.call('/ncs-fs','POST',{'data':'2026-09-30','tipo':'consumo',
+                                            'ug':'160001','numero':'NC-2026-01','valor':'2000.00'})
+        self.assertEqual(code,200,nc)
+        nc_id = nc['id']
+        items=[{'descricao':'Material A','quantidade':'3','preco_unitario':'500.00',
+                'nc_id':nc_id}]
+        code, first = self.call('/aquisicoes-fs','POST',{'itens':items})
+        self.assertEqual(code,200,first)
+        rows = self.call('/ncs-fs')[1]['ncs']
+        balance = next(row for row in rows if row['id']==nc_id)
+        self.assertEqual(balance['utilizado'],'1500.00')
+        self.assertEqual(balance['saldo'],'500.00')
+        code, second = self.call('/aquisicoes-fs','POST',{'itens':[
+            {'descricao':'Material B','quantidade':'2','preco_unitario':'100.00','nc_id':nc_id}]})
+        self.assertEqual(code,200,second)
+        balance = next(row for row in self.call('/ncs-fs')[1]['ncs'] if row['id']==nc_id)
+        self.assertEqual(balance['saldo'],'300.00')
+        self.assertEqual(self.call('/ncs-fs/'+str(nc_id),'PUT',
+            {'data':'2026-09-30','tipo':'consumo','ug':'160001','numero':'NC-2026-01',
+             'valor':'1900.00'})[0],200)
+        self.assertEqual(next(row for row in self.call('/ncs-fs')[1]['ncs']
+            if row['id']==nc_id)['saldo'],'200.00')
+        self.assertEqual(self.call('/aquisicoes-fs','POST',{'itens':[
+            {'descricao':'Material C','nc_id':999999}]})[0],400)
+        code, pa = self.call('/paassex','POST',
+            {'ano':2026,'nome':'Item solicitado','descricao':'Descrição','valor':'750.00','pregao':'PE-01'})
+        self.assertEqual(code,200,pa)
+        ident=pa['id']
+        self.assertEqual(self.call('/paassex/autorizacoes','POST',
+            {'ids':[ident],'autorizado':True})[0],200)
+        self.assertEqual(self.call('/paassex/'+str(ident),'PUT',
+            {'ano':2026,'nome':'Item solicitado','descricao':'Descrição atualizada',
+             'valor':'850.00','pregao':'PE-02'})[0],200)
+        saved=next(x for x in self.call('/paassex')[1]['itens'] if x['id']==ident)
+        self.assertEqual((saved['autorizado'],saved['valor'],saved['pregao']),
+                         (1,'850.00','PE-02'))
+        self.assertEqual(self.call('/paassex/'+str(ident),'PUT',
+            {'ano':2026,'nome':'Item','descricao':'Descrição','valor':'NaN'})[0],400)
+
     def test_paassex_selective_authorization(self):
         ids=[]
         for name in ('Primeiro','Segundo'):

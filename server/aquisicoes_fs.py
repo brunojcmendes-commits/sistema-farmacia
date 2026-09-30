@@ -35,6 +35,30 @@ def _data(valor):
     return value
 
 
+def _valor(value, label='Valor', optional=False):
+    raw = _texto(value, 40).replace(',', '.')
+    if optional and not raw: return ''
+    try:
+        n = Decimal(raw)
+        if not n.is_finite() or n < 0 or n.as_tuple().exponent < -2: raise ValueError()
+        return str(n.quantize(Decimal('0.01')))
+    except (InvalidOperation, ValueError):
+        raise ValueError(label + ' deve ser positivo ou zero, com até duas casas decimais.')
+
+
+def _ncs(c):
+    rows = [dict(r) for r in c.execute('SELECT * FROM notas_credito_fs ORDER BY data DESC,id DESC')]
+    spent = {}
+    for r in c.execute('SELECT nc_id,preco_total FROM aquisicoes_fs_itens WHERE nc_id IS NOT NULL'):
+        if r['preco_total']:
+            spent[r['nc_id']] = spent.get(r['nc_id'],Decimal('0')) + Decimal(r['preco_total'])
+    for row in rows:
+        used = spent.get(row['id'],Decimal('0'))
+        row['utilizado'] = str(used.quantize(Decimal('0.01')))
+        row['saldo'] = str((Decimal(row['valor'])-used).quantize(Decimal('0.01')))
+    return rows
+
+
 def _status(row):
     result = dict(row)
     empenho = result.get("empenho_data")
@@ -83,18 +107,31 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
           autorizado INTEGER NOT NULL DEFAULT 0,
           criado_em TEXT NOT NULL, atualizado_em TEXT NOT NULL,
           autorizado_em TEXT NOT NULL DEFAULT '', autorizado_por TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS notas_credito_fs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL, tipo TEXT NOT NULL,
+          ug TEXT NOT NULL, numero TEXT NOT NULL, valor TEXT NOT NULL,
+          criado_em TEXT NOT NULL, atualizado_em TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS aquisicoes_fs_itens (
           id INTEGER PRIMARY KEY AUTOINCREMENT, aquisicao_id INTEGER NOT NULL,
           posicao INTEGER NOT NULL, item TEXT NOT NULL DEFAULT '',
           codigo_catmat_catserv TEXT NOT NULL DEFAULT '', descricao TEXT NOT NULL DEFAULT '',
           unidade TEXT NOT NULL DEFAULT '', quantidade TEXT NOT NULL DEFAULT '',
           nd_si TEXT NOT NULL DEFAULT '', preco_unitario TEXT NOT NULL DEFAULT '',
-          preco_total TEXT NOT NULL DEFAULT '',
+          preco_total TEXT NOT NULL DEFAULT '', nc_id INTEGER,
+          FOREIGN KEY(nc_id) REFERENCES notas_credito_fs(id) ON DELETE RESTRICT,
           FOREIGN KEY(aquisicao_id) REFERENCES aquisicoes_fs(id) ON DELETE CASCADE);
         CREATE INDEX IF NOT EXISTS idx_aquisicoes_itens ON aquisicoes_fs_itens(aquisicao_id,posicao);
         CREATE INDEX IF NOT EXISTS idx_aquisicoes_empenho ON aquisicoes_fs(empenho_data);
         CREATE INDEX IF NOT EXISTS idx_paassex_ano ON paassex_itens(ano);
         """)
+        item_columns = {x[1] for x in con.execute('PRAGMA table_info(aquisicoes_fs_itens)')}
+        if 'nc_id' not in item_columns:
+            con.execute('ALTER TABLE aquisicoes_fs_itens ADD COLUMN nc_id INTEGER')
+        pa_columns = {x[1] for x in con.execute('PRAGMA table_info(paassex_itens)')}
+        if 'valor' not in pa_columns:
+            con.execute("ALTER TABLE paassex_itens ADD COLUMN valor TEXT NOT NULL DEFAULT ''")
+        if 'pregao' not in pa_columns:
+            con.execute("ALTER TABLE paassex_itens ADD COLUMN pregao TEXT NOT NULL DEFAULT ''")
         con.commit()
     finally:
         con.close()
@@ -171,6 +208,51 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
         except ValueError as exc:
             return jsonify(erro=str(exc)), 400
 
+    @app.route('/ncs-fs', methods=['GET','POST'])
+    def notas_credito_fs():
+        usuario, erro = autorizado()
+        if erro: return erro
+        if request.method == 'GET':
+            c = conn_factory()
+            try: return jsonify(ncs=_ncs(c))
+            finally: c.close()
+        return salvar_nc(None, usuario)
+
+    def salvar_nc(ident, usuario):
+        try:
+            d = body()
+            data, tipo = _data(d.get('data')), _texto(d.get('tipo'), 30)
+            ug, numero = _texto(d.get('ug'), 120), _texto(d.get('numero'), 120)
+            valor = _valor(d.get('valor'))
+            if not data or tipo not in ('consumo','servico','permanente') or not ug or not numero:
+                raise ValueError('Informe data, tipo, UG e número da NC.')
+            with lock:
+                c = conn_factory()
+                try:
+                    if ident is None:
+                        cur = c.execute("""INSERT INTO notas_credito_fs
+                            (data,tipo,ug,numero,valor,criado_em,atualizado_em)
+                            VALUES(?,?,?,?,?,?,?)""", (data,tipo,ug,numero,valor,agora(),agora()))
+                        ident = cur.lastrowid
+                    else:
+                        cur = c.execute("""UPDATE notas_credito_fs SET
+                            data=?,tipo=?,ug=?,numero=?,valor=?,atualizado_em=? WHERE id=?""",
+                            (data,tipo,ug,numero,valor,agora(),ident))
+                        if not cur.rowcount: return jsonify(erro='NC não encontrada.'),404
+                    c.commit()
+                finally: c.close()
+            audit('CADASTRAR_NC_FS' if request.method=='POST' else 'EDITAR_NC_FS',
+                  'notas_credito_fs',ident,numero,usuario=usuario['usuario'])
+            return jsonify(ok=True,id=ident)
+        except (ValueError,TypeError) as exc:
+            return jsonify(erro=str(exc)),400
+
+    @app.route('/ncs-fs/<int:ident>',methods=['PUT'])
+    def editar_nc_fs(ident):
+        usuario, erro = autorizado()
+        if erro: return erro
+        return salvar_nc(ident,usuario)
+
     @app.route("/aquisicoes-fs", methods=["GET", "POST"])
     def aquisicoes_fs():
         usuario, erro = autorizado()
@@ -188,7 +270,7 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
                     if not acquisition['itens'] and acquisition['material']:
                         acquisition['itens'] = [{'item':'1','codigo_catmat_catserv':'',
                             'descricao':acquisition['material'],'unidade':'','quantidade':'',
-                            'nd_si':'','preco_unitario':'','preco_total':''}]
+                            'nd_si':'','preco_unitario':'','preco_total':'','nc_id':None}]
                 return jsonify(aquisicoes=result)
             finally:
                 c.close()
@@ -210,6 +292,11 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
                 if not item['descricao']:
                     raise ValueError('Informe a descrição de cada item.')
                 item['item'] = item['item'] or str(index+1)
+                nc = raw.get('nc_id')
+                try:
+                    item['nc_id'] = int(nc) if nc else None
+                    if item['nc_id'] is not None and item['nc_id'] <= 0: raise ValueError()
+                except (ValueError,TypeError): raise ValueError('Selecione uma NC válida.')
                 item['preco_total'] = ''
                 if item['quantidade'] or item['preco_unitario']:
                     try:
@@ -237,6 +324,10 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
                 try:
                     if data["empresa_id"] and not c.execute("SELECT 1 FROM empresas_fs WHERE id=?", (data["empresa_id"],)).fetchone():
                         raise ValueError("Empresa não cadastrada.")
+                    for item in items:
+                        if item['nc_id'] is not None and not c.execute(
+                                'SELECT 1 FROM notas_credito_fs WHERE id=?',(item['nc_id'],)).fetchone():
+                            raise ValueError('NC não cadastrada.')
                     values = tuple(data[k] for k in CAMPOS)
                     if ident is None:
                         columns = ",".join(CAMPOS) + ",criado_em,atualizado_em"
@@ -252,8 +343,9 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
                         c.execute('DELETE FROM aquisicoes_fs_itens WHERE aquisicao_id=?', (ident,))
                         for position, item in enumerate(items):
                             c.execute('''INSERT INTO aquisicoes_fs_itens
-                                (aquisicao_id,posicao,item,codigo_catmat_catserv,descricao,unidade,quantidade,nd_si,preco_unitario,preco_total)
-                                VALUES(?,?,?,?,?,?,?,?,?,?)''', (ident,position,*item.values()))
+                                (aquisicao_id,posicao,item,codigo_catmat_catserv,descricao,unidade,quantidade,nd_si,preco_unitario,preco_total,nc_id)
+                                VALUES(?,?,?,?,?,?,?,?,?,?,?)''', (ident,position,*[item[k] for k in
+                                    ('item','codigo_catmat_catserv','descricao','unidade','quantidade','nd_si','preco_unitario','preco_total','nc_id')]))
                     c.commit()
                 finally:
                     c.close()
@@ -270,36 +362,51 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
             return erro
         return salvar_aquisicao(ident, usuario)
 
-    @app.route("/paassex", methods=["GET", "POST"])
+    @app.route('/paassex',methods=['GET','POST'])
     def paassex():
         usuario, erro = autorizado()
-        if erro:
-            return erro
-        if request.method == "GET":
+        if erro: return erro
+        if request.method == 'GET':
             c = conn_factory()
-            try:
-                return jsonify(itens=[dict(r) for r in c.execute("SELECT * FROM paassex_itens ORDER BY ano DESC,id DESC")])
-            finally:
-                c.close()
+            try: return jsonify(itens=[dict(r) for r in c.execute(
+                'SELECT * FROM paassex_itens ORDER BY ano DESC,id DESC')])
+            finally: c.close()
+        return salvar_paassex(None,usuario)
+
+    def salvar_paassex(ident, usuario):
         try:
             d = body()
-            ano = int(d.get("ano"))
-            nome, descricao = _texto(d.get("nome"), 240), _texto(d.get("descricao"), 2000)
+            ano = int(d.get('ano'))
+            nome, descricao = _texto(d.get('nome'),240),_texto(d.get('descricao'),2000)
+            valor, pregao = _valor(d.get('valor'),'Valor do item',optional=True),_texto(d.get('pregao'),120)
             if not 2000 <= ano <= 2100 or not nome or not descricao:
-                raise ValueError("Informe ano, nome e descrição do item.")
+                raise ValueError('Informe ano, nome e descrição do item.')
             with lock:
                 c = conn_factory()
                 try:
-                    cur = c.execute("INSERT INTO paassex_itens(ano,nome,descricao,criado_em,atualizado_em) VALUES(?,?,?,?,?)",
-                                    (ano, nome, descricao, agora(), agora()))
+                    if ident is None:
+                        cur = c.execute("""INSERT INTO paassex_itens
+                            (ano,nome,descricao,valor,pregao,criado_em,atualizado_em)
+                            VALUES(?,?,?,?,?,?,?)""",(ano,nome,descricao,valor,pregao,agora(),agora()))
+                        ident = cur.lastrowid
+                    else:
+                        cur = c.execute("""UPDATE paassex_itens SET
+                            ano=?,nome=?,descricao=?,valor=?,pregao=?,atualizado_em=? WHERE id=?""",
+                            (ano,nome,descricao,valor,pregao,agora(),ident))
+                        if not cur.rowcount: return jsonify(erro='Item PAASSEx não encontrado.'),404
                     c.commit()
-                    ident = cur.lastrowid
-                finally:
-                    c.close()
-            audit("SOLICITAR_ITEM_PAASSEX", "paassex_itens", ident, nome, usuario=usuario["usuario"])
-            return jsonify(ok=True, id=ident)
-        except (ValueError, TypeError) as exc:
-            return jsonify(erro=str(exc)), 400
+                finally: c.close()
+            audit('SOLICITAR_ITEM_PAASSEX' if request.method=='POST' else 'EDITAR_ITEM_PAASSEX',
+                  'paassex_itens',ident,nome,usuario=usuario['usuario'])
+            return jsonify(ok=True,id=ident)
+        except (ValueError,TypeError) as exc:
+            return jsonify(erro=str(exc)),400)
+
+    @app.route('/paassex/<int:ident>',methods=['PUT'])
+    def editar_paassex(ident):
+        usuario, erro = autorizado()
+        if erro: return erro
+        return salvar_paassex(ident,usuario)
 
     @app.route("/paassex/autorizacoes", methods=["POST"])
     def autorizar_paassex():

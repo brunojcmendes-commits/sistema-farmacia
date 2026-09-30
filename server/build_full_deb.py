@@ -49,7 +49,7 @@ Group=farmacia
 WantedBy=multi-user.target
 ''')
     (control / 'control').write_text('''Package: farmacia-servidor
-Version: 1.4.6
+Version: 1.4.7
 Section: misc
 Priority: optional
 Architecture: all
@@ -69,7 +69,7 @@ db=/var/lib/farmacia-servidor/farmacia.db
 if [ -f "$db" ]; then
   mkdir -p /var/backups/sistfarma-servidor
   STAMP=$(date +%Y%m%d-%H%M%S)
-  export SISTFARMA_BACKUP_DB="$db" SISTFARMA_BACKUP_OUT="/var/backups/sistfarma-servidor/antes_1.4.6_${STAMP}.db"
+  export SISTFARMA_BACKUP_DB="$db" SISTFARMA_BACKUP_OUT="/var/backups/sistfarma-servidor/antes_1.4.7_${STAMP}.db"
   python3 - <<'PYBACKUP'
 import os, sqlite3
 source = sqlite3.connect(os.environ['SISTFARMA_BACKUP_DB'])
