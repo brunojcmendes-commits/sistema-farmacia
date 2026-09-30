@@ -400,7 +400,7 @@ def instalar(app, conn_factory, lock, agora, exigir_login, audit):
                   'paassex_itens',ident,nome,usuario=usuario['usuario'])
             return jsonify(ok=True,id=ident)
         except (ValueError,TypeError) as exc:
-            return jsonify(erro=str(exc)),400)
+            return jsonify(erro=str(exc)),400
 
     @app.route('/paassex/<int:ident>',methods=['PUT'])
     def editar_paassex(ident):
